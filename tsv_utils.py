@@ -39,6 +39,8 @@ def match_tsv_row(tsv_path: str, photog: str, photo_start: str, photo_end: str) 
   return None
 
 
+""" 
+# Test data
 if __name__=="__main__":
   from pprint import pprint
 
@@ -53,4 +55,5 @@ if __name__=="__main__":
     print(f"Match found! MEID: {match}")
   else:
     print("No match found")
-  
+  """
+

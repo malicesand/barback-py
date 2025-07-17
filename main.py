@@ -1,4 +1,5 @@
 import os
+import subprocess
 from photo_utils import get_first_and_last_data
 from tsv_utils import match_tsv_row
 
@@ -51,11 +52,16 @@ def main():
         print(f"Renamed unmatched folder to {unmatched_name}")
       except Exception as e:
         print(f"Failed to rename unmatched folder: {e}")
+  
+    # End of your loop, after everything is done
+    print(f"\n✅ Done! Opening folder in Finder: {MEDIA_ROOT}")
+    subprocess.run(["open", MEDIA_ROOT])
 
   if __name__ == "__main__":
     main()
     
-    
+
+  
   """
   code for early bail
   # If first unmatched found, stop checking further
