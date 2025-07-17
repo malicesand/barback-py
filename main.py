@@ -37,7 +37,7 @@ def main():
     else:
       print("No matching entry in the TSV")
 
-  if __name__ == "__main__":
+  if __name__ == "__main__"
     main()
     
     

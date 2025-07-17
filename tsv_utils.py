@@ -38,4 +38,19 @@ def match_tsv_row(tsv_path: str, artist: str, photo_start: str, photo_end: str) 
       
   return None
 
+
+if __name__=="__main__":
+  from pprint import pprint
+
+  #Dummy photo metadata to test
+  test_artist = "JKB"
+  test_start = "2024-07-21 9:45:00"
+  test_end = "2024-07-21 11:45:00"
+
+  match = match_tsv_row("data/metadata.tsv", test_artist, test_start, test_end)
+
+  if match:
+    print(f"Match found! MEID: {match}")
+  else:
+    print("No match found")
   
