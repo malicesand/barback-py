@@ -3,7 +3,7 @@ import subprocess
 from photo_utils import get_first_and_last_data
 from tsv_utils import match_tsv_row
 
-MEDIA_ROOT = '/Volumes'
+MEDIA_ROOT = '/Volumes/'
 TSV_PATH = "/data/metadata.tsv"
 
 def main():
