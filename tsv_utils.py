@@ -10,7 +10,7 @@ import csv
 from typing import Optional
 from datetime import datetime
 
-def match_tsv_row(tsv_path: str, artist: str, photo_start: str, photo_end: str) -> Optional[str]:
+def match_tsv_row(tsv_path: str, photog: str, photo_start: str, photo_end: str) -> Optional[str]:
   """
   Match photo metadata to an event row in the TSV
   Returns the MEID if a match is found.
@@ -18,8 +18,8 @@ def match_tsv_row(tsv_path: str, artist: str, photo_start: str, photo_end: str) 
   with open (tsv_path, newline='') as file:
     reader = csv.DictReader(file, delimiter='\t')
     for row in reader:
-      row_artist = row['AssignedPhotographer'].strip()
-      if row_artist != artist:
+      row_photog = row['AssignedPhotographer'].strip()
+      if row_photog != photog:
         continue
 
       # Parse all times as datetime objects
@@ -43,11 +43,11 @@ if __name__=="__main__":
   from pprint import pprint
 
   #Dummy photo metadata to test
-  test_artist = "JKB"
+  test_photog = "JKB"
   test_start = "2024-07-21 9:45:00"
   test_end = "2024-07-21 11:45:00"
 
-  match = match_tsv_row("data/metadata.tsv", test_artist, test_start, test_end)
+  match = match_tsv_row("data/metadata.tsv", test_photog, test_start, test_end)
 
   if match:
     print(f"Match found! MEID: {match}")

@@ -11,63 +11,60 @@ def get_image_files(dir_path: str) -> List[str]:
     f for f in os.listdir(dir_path)
     if f.endswith(('.NEF', '.CR2', '.ARW', '.RAF'))
   ]
+
 # Function: Read date + photographer from ONE image file
-def get_metadata(filepath: str) -> Optional[Tuple[str, str]]:
+def get_metadata(filepath: str) -> Optional[str]:
   try:
-    # Run exiftool to get DateTimeOriginal and Artist fields
+    # Run exiftool to get DateTimeOriginal fields
     result = subprocess.run(
-      ['exiftool', '-DateTimeOriginal', 'Artist', filepath],
+      ['exiftool', '-DateTimeOriginal', filepath],
       capture_output=True, text=True
     )
 
     # Split the output into lines like
     # Date/Time Original : 2023:07:16 18:32:12
-    # Artist             : Josh 
     lines = result.stdout.strip().split('\n')
-
-    # Prepare placeholders
-    date = artist = None
 
     # Loop through each line and extract values
     for line in lines:
       if 'Date/Time Original' in line:
         date = line.split(':', 1)[1].strip()
-      elif 'Artist' in line:
-        artist = line.split(':', 1)[1].strip()
-
-      # If both values are found, return them
-      if date and artist:
-        return date, artist
-      else:
-        return None
+        return date
+      
+    return None # if no date found
     
   except Exception as e:
     # If exiftool failed or something went wrong print error
     print(f"Error reading {filepath}: {e}")
     return None
   
-  # Get the metadata from the first and last image
-  def get_first_and_last_data(dir_path: str) -> Optional[Tuple[str, str, str]]:
-    # Get list of image files in the folder
-    image_files = get_image_files(dir_path)
-    length = len(image_files)
+# Get the metadata from the first and last image
+def get_first_and_last_data(dir_path: str) -> Optional[Tuple[str, str, str]]:
+  # Get list of image files in the folder
+  image_files = get_image_files(dir_path)
+  # If there are no image files, stop early
+  if not image_files:
+    return None
 
-    # If there are no image files, stop early
-    if not image_files:
-      return None
-    
-    # Pick the first photo as the reference
-    first_reference = get_metadata(os.path.join(dir_path, image_files[0]))
-    if not first_reference:
-      return None
-    # Pick the last photo as the reference
-    last_reference = get_metadata(os.path.join(dir_path, image_files[length - 1]))
-    if not last_reference:
-      return None
-    
-    start_time, artist = first_reference
-    end_time, _ = last_reference
-    # All matched: return the references
-    return artist, start_time, end_time
+  # Sort image files so first and last match capture order
+  image_files.sort()
+
+  first_file = os.path.join(dir_path, image_files[0])
+  last_file = os.path.join(dir_path, image_files[-1])
+
+  # Get timestamps from EXIF data
+  first_metadata = get_metadata(first_file)
+  last_metadata = get_metadata(last_file)
+
+  if not first_metadata or not last_metadata:
+    return None
+
+  start_time = first_metadata
+  end_time  = last_metadata
+
+  # Extract initials from filename
+  prefix = image_files[0].split('_')[0].upper()
+  # All matched: return the references
+  return prefix, start_time, end_time
       
     

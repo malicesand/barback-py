@@ -20,12 +20,12 @@ def main():
       print("Could not extract photo metadata")
       continue
 
-    artist, start_time, end_time, = photo_data
-    print(f"Artist: {artist}")
+    prefix, start_time, end_time, = photo_data
+    print(f"Photographer: {prefix}")
     print(f"Range: {start_time} -> {end_time}")
 
     # Match the folder's metadata to a row in the TSV
-    match = match_tsv_row(TSV_PATH, artist, start_time, end_time)
+    match = match_tsv_row(TSV_PATH, prefix, start_time, end_time)
     if match: 
       print(f"Matched MEID: {match}")
       new_path = os.path.join(MEDIA_ROOT, match)
