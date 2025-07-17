@@ -70,10 +70,4 @@ def get_metadata(filepath: str) -> Optional[Tuple[str, str]]:
     # All matched: return the references
     return artist, start_time, end_time
       
-    # if last_reference
-    # # Loop through the rest of the list and compare
-    # for fname in image_files[1:]:
-    #   current = get_metadata(os.path.join(dir_path, fname))
-    #   if current != reference:
-    #   # If one photo is different, stope and return None
-    #     return None
+    
