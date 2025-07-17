@@ -37,10 +37,38 @@ def main():
     else:
       print("No matching entry in the TSV")
 
-  if __name__ == "__main__"
+      # Rename folder to add "_UNMATCHED"
+      unmatched_index = 1
+      unmatched_name = f"{folder}_UNMATCHED_{unmatched_index}"
+      while os.path.exists(os.path.join(MEDIA_ROOT, unmatched_name)):
+        unmatched_index += 1
+        unmatched_name = f"{folder}_UNMATCHED_{unmatched_index}"
+
+      new_path = os.path.join(MEDIA_ROOT, unmatched_name)
+
+      try: 
+        os.rename(dir_path, new_path)
+        print(f"Renamed unmatched folder to {unmatched_name}")
+      except Exception as e:
+        print(f"Failed to rename unmatched folder: {e}")
+
+  if __name__ == "__main__":
     main()
     
     
-    
+  """
+  code for early bail
+  # If first unmatched found, stop checking further
+stop_on_first_unmatched = True
+
+...
+
+if match:
+    ...
+else:
+    ...
+    if stop_on_first_unmatched:
+        break
+  """
 
       
