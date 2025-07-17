@@ -3,14 +3,21 @@ import subprocess
 from photo_utils import get_first_and_last_data
 from tsv_utils import match_tsv_row
 
-MEDIA_ROOT = '/path/to/removable/media' 
+MEDIA_ROOT = '/Volumes'
 TSV_PATH = "/data/metadata.tsv"
 
 def main():
+  # Access DCIM in Removable Media
+  for drive in os.listdir(MEDIA_ROOT):
+    drive_path = os.path.join(MEDIA_ROOT, drive)
+    dcim_path = os.path.join(drive_path, 'DCIM')
+
+    if not os.path.isdir(dcim_path):
+      continue #skip if no DCIM folder
 
   # Loop through each subfolder in the removable media
-  for folder in os.listdir(MEDIA_ROOT):
-    dir_path = os.path.join(MEDIA_ROOT, folder)
+  for folder in os.listdir(dcim_path):
+    dir_path = os.path.join(dcim_path, folder)
     if not os.path.isdir(dir_path):
       continue
 
@@ -29,7 +36,8 @@ def main():
     match = match_tsv_row(TSV_PATH, prefix, start_time, end_time)
     if match: 
       print(f"Matched MEID: {match}")
-      new_path = os.path.join(MEDIA_ROOT, match)
+      # new_path = os.path.join(MEDIA_ROOT, match)
+      new_path = os.path.join(os.path.dirname(dir_path), match)
       try: 
         os.rename(dir_path, new_path)
         print(f"Renamed folder to {match} ")
@@ -41,11 +49,11 @@ def main():
       # Rename folder to add "_UNMATCHED"
       unmatched_index = 1
       unmatched_name = f"{folder}_UNMATCHED_{unmatched_index}"
-      while os.path.exists(os.path.join(MEDIA_ROOT, unmatched_name)):
+      while os.path.exists(os.path.join(os.path.dirname(dir_path), unmatched_name)):
         unmatched_index += 1
         unmatched_name = f"{folder}_UNMATCHED_{unmatched_index}"
 
-      new_path = os.path.join(MEDIA_ROOT, unmatched_name)
+      new_path = os.path.join(os.path.dirname(dir_path), unmatched_name)
 
       try: 
         os.rename(dir_path, new_path)
