@@ -3,70 +3,115 @@ import subprocess
 from photo_utils import get_first_and_last_data
 from tsv_utils import match_tsv_row
 
-MEDIA_ROOT = '/Volumes/'
-TSV_PATH = "/data/metadata.tsv"
+VOLUMES_ROOT = "/Volumes/"
+TSV_PATH = "/Users/maryalice/dev/totc_2025/barback-py/data/metadata.tsv"
 
 def main():
+  # Log check
+  # print("📂 All volumes:")
+  # for d in os.listdir(VOLUMES_ROOT):
+  #   print(f"  - {d}")
+
   # Access DCIM in Removable Media
-  for drive in os.listdir(MEDIA_ROOT):
-    drive_path = os.path.join(MEDIA_ROOT, drive)
+  for drive in os.listdir(VOLUMES_ROOT):
+    drive_path = os.path.join(VOLUMES_ROOT, drive)
+
+    # Skip system volume 
+    if drive == "Macintosh HD" or not os.path.isdir(drive_path):
+      continue
+
+    # Go one level deeper  
     dcim_path = os.path.join(drive_path, 'DCIM')
 
-    if not os.path.isdir(dcim_path):
+    if not os.path.exists(dcim_path):
+      print(f'👾 Skipping {drive_path} - no DCIM folder found')
       continue #skip if no DCIM folder
 
+    print(f'\n🧿 Found DCIM at {dcim_path}')
+
+    # Process dcim_path as media root
+    process_dcim(dcim_path)
+
+  # End of your loop, after everything is done
+  print(f"\n✅ Done! Opening folder in Finder: {VOLUMES_ROOT}") 
+  subprocess.run(["open", VOLUMES_ROOT])
+  
+def process_dcim(dcim_path):
   # Loop through each subfolder in the removable media
   for folder in os.listdir(dcim_path):
     dir_path = os.path.join(dcim_path, folder)
     if not os.path.isdir(dir_path):
       continue
 
-    print(f"\n Checking folder: {dir_path}")
+    print(f"\n👀 Checking folder: {dir_path}")
     photo_data = get_first_and_last_data(dir_path)
 
     if not photo_data:
-      print("Could not extract photo metadata")
+      print("\t❌ Could not extract photo metadata")
       continue
 
     prefix, start_time, end_time, = photo_data
-    print(f"Photographer: {prefix}")
-    print(f"Range: {start_time} -> {end_time}")
+    print(f"\tPhotographer: {prefix}")
+    print(f"\tRange: {start_time} -> {end_time}")
 
     # Match the folder's metadata to a row in the TSV
     match = match_tsv_row(TSV_PATH, prefix, start_time, end_time)
     if match: 
-      print(f"Matched MEID: {match}")
+      print(f"\t👾 Matched MEID: {match}")
       # new_path = os.path.join(MEDIA_ROOT, match)
       new_path = os.path.join(os.path.dirname(dir_path), match)
-      try: 
-        os.rename(dir_path, new_path)
-        print(f"Renamed folder to {match} ")
-      except Exception as e:
-        print(f"Failed to rename folder: {e}")
+      if not os.path.exists(new_path):
+        try: 
+          os.rename(dir_path, new_path)
+          print(f"\t💾 Renamed folder to {match} ")
+        except Exception as e:
+          print(f"\t❌ Failed to rename folder: {e}")
+      else:
+        # Folder already exists — move contents into it
+        print(f"\t📂 {match} already exists. Moving files into it...")
+
+        try: 
+          for file in os.listdir(dir_path):
+            src_file = os.path.join(dir_path, file)
+            dest_file = os.path.join(new_path, file)
+
+            # Rename if duplicate photo filename exists
+            if os.path.exists(dest_file):
+              base, ext = os.path.splittext(file)
+              i = 1
+              while os.path.exists(dest_file):
+                new_name = f"{base}_{i}{ext}"
+                dest_file = os.path.join(new_path, new_name)
+                i += 1
+
+            os.rename(src_file, dest_file)
+
+          # Remove the now-empty folder
+          os.rmdir(dir_path)
+          print(f"\t  🗃️ Moved files and deleted original folder: {dir_path}")
+
+        except Exception as e:
+          print(f"\t  ❌ Error while merging folders: {e}")
     else:
-      print("No matching entry in the TSV")
+      print("\t🙈 No matching entry in the TSV")
 
       # Rename folder to add "_UNMATCHED"
-      unmatched_index = 1
-      unmatched_name = f"{folder}_UNMATCHED_{unmatched_index}"
+      # unmatched_index = 1
+      unmatched_name = f"{folder}_UNMATCHED_"
       while os.path.exists(os.path.join(os.path.dirname(dir_path), unmatched_name)):
-        unmatched_index += 1
-        unmatched_name = f"{folder}_UNMATCHED_{unmatched_index}"
+        
+        unmatched_name = f"{folder}_UNMATCHED_"
 
       new_path = os.path.join(os.path.dirname(dir_path), unmatched_name)
 
       try: 
         os.rename(dir_path, new_path)
-        print(f"Renamed unmatched folder to {unmatched_name}")
+        print(f"\t   👻 Renamed unmatched folder to {unmatched_name}")
       except Exception as e:
-        print(f"Failed to rename unmatched folder: {e}")
-  
-    # End of your loop, after everything is done
-    print(f"\n✅ Done! Opening folder in Finder: {MEDIA_ROOT}")
-    subprocess.run(["open", MEDIA_ROOT])
+        print(f"\t   ❌ Failed to rename unmatched folder: {e}")
 
-  if __name__ == "__main__":
-    main()
+if __name__ == "__main__":
+  main()
     
 
   

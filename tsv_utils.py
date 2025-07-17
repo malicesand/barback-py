@@ -26,10 +26,10 @@ def match_tsv_row(tsv_path: str, photog: str, photo_start: str, photo_end: str) 
       try: 
         row_start = datetime.strptime(row['start.dateTime'].strip(), "%Y-%m-%d %H:%M:%S")
         row_end = datetime.strptime(row['end.dateTime'].strip(), "%Y-%m-%d %H:%M:%S")
-        photo_start_dt = datetime.strptime(photo_start.strip(), "%Y-%m-%d %H:%M:%S")
-        photo_end_dt = datetime.strptime(photo_end.strip(), "%Y-%m-%d %H:%M:%S")
+        photo_start_dt = datetime.strptime(photo_start.strip(), "%Y:%m:%d %H:%M:%S")
+        photo_end_dt = datetime.strptime(photo_end.strip(), "%Y:%m:%d %H:%M:%S")
       except Exception as e:
-        print(f"Time parsing error: {e}")
+        print(f"⏰ Time parsing error: {e}")
         continue
 
       # Check if photo range falls withing row range
@@ -37,23 +37,4 @@ def match_tsv_row(tsv_path: str, photog: str, photo_start: str, photo_end: str) 
         return row['MEID']
       
   return None
-
-
-""" 
-# Test data
-if __name__=="__main__":
-  from pprint import pprint
-
-  #Dummy photo metadata to test
-  test_photog = "JKB"
-  test_start = "2024-07-21 9:45:00"
-  test_end = "2024-07-21 11:45:00"
-
-  match = match_tsv_row("data/metadata.tsv", test_photog, test_start, test_end)
-
-  if match:
-    print(f"Match found! MEID: {match}")
-  else:
-    print("No match found")
-  """
 

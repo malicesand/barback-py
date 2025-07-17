@@ -6,10 +6,10 @@ from typing import Optional, Tuple, List # type hints
 # Functions: Get all image files in a directory
 def get_image_files(dir_path: str) -> List[str]:
   # For loop through the folder
-  # Return a list of files ending in (.NEF, .CR2, .ARW, .RAF)
+  # Return a list of files ending in (.NEF, .CR2, .ARW, .RAF, .jpg, .png)
   return [
     f for f in os.listdir(dir_path)
-    if f.endswith(('.NEF', '.CR2', '.ARW', '.RAF'))
+    if f.endswith(('.NEF', '.CR2', '.ARW', '.RAF', '.jpg', '.png'))
   ]
 
 # Function: Read date + photographer from ONE image file
@@ -35,7 +35,7 @@ def get_metadata(filepath: str) -> Optional[str]:
     
   except Exception as e:
     # If exiftool failed or something went wrong print error
-    print(f"Error reading {filepath}: {e}")
+    print(f"❌ Error reading {filepath}: {e}")
     return None
   
 # Get the metadata from the first and last image
@@ -63,7 +63,7 @@ def get_first_and_last_data(dir_path: str) -> Optional[Tuple[str, str, str]]:
   end_time  = last_metadata
 
   # Extract initials from filename
-  prefix = image_files[0].split('_')[0].upper()
+  prefix = image_files[0].split('_')[0].upper() #! fix this #!
   # All matched: return the references
   return prefix, start_time, end_time
       
