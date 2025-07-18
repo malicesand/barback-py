@@ -2,6 +2,7 @@
 import subprocess # to run exiftool
 import os # to work with file paths
 from typing import Optional, Tuple, List # type hints
+import time #for exiftool throttling
 
 # Functions: Get all image files in a directory
 def get_image_files(dir_path: str) -> List[str]:
@@ -14,15 +15,17 @@ def get_image_files(dir_path: str) -> List[str]:
 
 # Function: Read date + photographer from ONE image file
 def get_metadata(filepath: str) -> Optional[str]:
+
   try:
     # Run exiftool to get DateTimeOriginal fields
     result = subprocess.run(
       ['exiftool', '-DateTimeOriginal', filepath],
       capture_output=True, text=True
     )
-
-    # Split the output into lines like
-    # Date/Time Original : 2023:07:16 18:32:12
+     # 50ms delay between calls
+    time.sleep(0.05)
+    
+    # Split the output to match Date/Time Original : 2023:07:16 18:32:12
     lines = result.stdout.strip().split('\n')
 
     # Loop through each line and extract values
