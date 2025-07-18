@@ -1,6 +1,8 @@
 import os
 import csv
+import sys
 import subprocess
+from pathlib import Path
 from photo_utils import get_first_and_last_data
 from tsv_utils import match_tsv_row
 from prefix_utils import load_prefix_map
@@ -23,6 +25,11 @@ def main():
   # print("📂 All volumes:")
   # for d in os.listdir(VOLUMES_ROOT):
   #   print(f"  - {d}")
+
+  # Language for dialog box
+  base_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
+  dcim_path = base_dir / 'DCIM'
+  print(f'Renaming files in {dcim_path}')
 
   # load prefix map
   prefix_map = load_prefix_map("data/prefix.tsv")  
