@@ -1,4 +1,5 @@
 import os
+import csv
 import subprocess
 from photo_utils import get_first_and_last_data
 from tsv_utils import match_tsv_row
@@ -6,7 +7,16 @@ from prefix_utils import load_prefix_map
 
 VOLUMES_ROOT = "/Volumes/"
 TSV_PATH = os.path.join(os.path.dirname(__file__), "data/metadata.tsv")
-# prefix_map = load_prefix_map('prefix.tsv')
+LOG_PATH = 'run_log.csv'
+
+# Helper function for logging progress and status to csv
+def write_log_row(folder, prefix, start, end, result, status):
+    log_exists = os.path.exists(LOG_PATH)
+    with open(LOG_PATH, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not log_exists:
+            writer.writerow(['folder', 'prefix', 'start', 'end', 'result', 'status'])  # header
+        writer.writerow([folder, prefix, start, end, result, status])
 
 def main():
   # Log check
@@ -68,8 +78,10 @@ def process_dcim(dcim_path, prefix_map):
       if not os.path.exists(new_path):
         try: 
           os.rename(dir_path, new_path)
+          write_log_row(folder, match, photographer, start_time, end_time, status='matched')
           print(f"\t💾 Renamed folder to {match} ")
         except Exception as e:
+          write_log_row(folder, None, photographer, start_time, end_time, status=f'error: {e}')
           print(f"\t❌ Failed to rename folder: {e}")
       else:
         # Folder already exists — move contents into it
@@ -99,18 +111,16 @@ def process_dcim(dcim_path, prefix_map):
           print(f"\t  ❌ Error while merging folders: {e}")
     else:
       print("\t🙈 No matching entry in the TSV")
-
       # Rename folder to add "_UNMATCHED"
-      # unmatched_index = 1
-      unmatched_name = f"{folder}_UNMATCHED_"
-      while os.path.exists(os.path.join(os.path.dirname(dir_path), unmatched_name)):
-        
-        unmatched_name = f"{folder}_UNMATCHED_"
+      unmatched_name = f"{folder}_UNMATCHED"
+      # while os.path.exists(os.path.join(os.path.dirname(dir_path), unmatched_name)):  
+      #   unmatched_name = f"{folder}_UNMATCHED"
 
       new_path = os.path.join(os.path.dirname(dir_path), unmatched_name)
 
       try: 
         os.rename(dir_path, new_path)
+        write_log_row(folder, None, photographer, start_time, end_time, status='unmatched')
         print(f"\t   👻 Renamed unmatched folder to {unmatched_name}")
       except Exception as e:
         print(f"\t   ❌ Failed to rename unmatched folder: {e}")
