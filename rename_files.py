@@ -113,9 +113,6 @@ def process_dcim(dcim_path, prefix_map):
       print("\t🙈 No matching entry in the TSV")
       # Rename folder to add "_UNMATCHED"
       unmatched_name = f"{folder}_UNMATCHED"
-      # while os.path.exists(os.path.join(os.path.dirname(dir_path), unmatched_name)):  
-      #   unmatched_name = f"{folder}_UNMATCHED"
-
       new_path = os.path.join(os.path.dirname(dir_path), unmatched_name)
 
       try: 
@@ -127,22 +124,4 @@ def process_dcim(dcim_path, prefix_map):
 
 if __name__ == "__main__":
   main()
-    
-
-  
-  """
-  code for early bail
-  # If first unmatched found, stop checking further
-stop_on_first_unmatched = True
-
-...
-
-if match:
-    ...
-else:
-    ...
-    if stop_on_first_unmatched:
-        break
-  """
-
       
