@@ -2,15 +2,20 @@ import os
 import subprocess
 from photo_utils import get_first_and_last_data
 from tsv_utils import match_tsv_row
+from prefix_utils import load_prefix_map
 
 VOLUMES_ROOT = "/Volumes/"
-TSV_PATH = "/Users/maryalice/dev/totc_2025/barback-py/data/metadata.tsv"
+TSV_PATH = os.path.join(os.path.dirname(__file__), "data/metadata.tsv")
+# prefix_map = load_prefix_map('prefix.tsv')
 
 def main():
   # Log check
   # print("📂 All volumes:")
   # for d in os.listdir(VOLUMES_ROOT):
   #   print(f"  - {d}")
+
+  # load prefix map
+  prefix_map = load_prefix_map("data/prefix.tsv")  
 
   # Access DCIM in Removable Media
   for drive in os.listdir(VOLUMES_ROOT):
@@ -30,13 +35,13 @@ def main():
     print(f'\n🧿 Found DCIM at {dcim_path}')
 
     # Process dcim_path as media root
-    process_dcim(dcim_path)
+    process_dcim(dcim_path, prefix_map)
 
   # End of your loop, after everything is done
   print(f"\n✅ Done! Opening folder in Finder: {VOLUMES_ROOT}") 
   subprocess.run(["open", VOLUMES_ROOT])
   
-def process_dcim(dcim_path):
+def process_dcim(dcim_path, prefix_map):
   # Loop through each subfolder in the removable media
   for folder in os.listdir(dcim_path):
     dir_path = os.path.join(dcim_path, folder)
@@ -44,18 +49,18 @@ def process_dcim(dcim_path):
       continue
 
     print(f"\n👀 Checking folder: {dir_path}")
-    photo_data = get_first_and_last_data(dir_path)
+    photo_data = get_first_and_last_data(dir_path, prefix_map)
 
     if not photo_data:
       print("\t❌ Could not extract photo metadata")
       continue
 
-    prefix, start_time, end_time, = photo_data
-    print(f"\tPhotographer: {prefix}")
+    photographer, start_time, end_time, = photo_data
+    print(f"\tPhotographer: {photographer}")
     print(f"\tRange: {start_time} -> {end_time}")
 
     # Match the folder's metadata to a row in the TSV
-    match = match_tsv_row(TSV_PATH, prefix, start_time, end_time)
+    match = match_tsv_row(TSV_PATH, photographer, start_time, end_time)
     if match: 
       print(f"\t👾 Matched MEID: {match}")
       # new_path = os.path.join(MEDIA_ROOT, match)

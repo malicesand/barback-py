@@ -37,9 +37,19 @@ def get_metadata(filepath: str) -> Optional[str]:
     # If exiftool failed or something went wrong print error
     print(f"❌ Error reading {filepath}: {e}")
     return None
-  
+
+# Extract prefix from filename using longest match
+def extract_known_prefix(filename: str, prefix_map: dict) -> Optional[str]:
+  prefix_candidate = filename.upper()[:3]
+  if prefix_candidate in prefix_map:
+    return prefix_candidate
+# for prefix in sorted(prefix_map, key=len, reverse=True):
+#   if filename.upper().startswith(prefix):
+#     return prefix
+  return None
+
 # Get the metadata from the first and last image
-def get_first_and_last_data(dir_path: str) -> Optional[Tuple[str, str, str]]:
+def get_first_and_last_data(dir_path: str, prefix_map: dict) -> Optional[Tuple[str, str, str]]:
   # Get list of image files in the folder
   image_files = get_image_files(dir_path)
   # If there are no image files, stop early
@@ -62,9 +72,18 @@ def get_first_and_last_data(dir_path: str) -> Optional[Tuple[str, str, str]]:
   start_time = first_metadata
   end_time  = last_metadata
 
-  # Extract initials from filename
-  prefix = image_files[0].split('_')[0].upper() #! fix this #!
+  # Assign photographer based on prefix
+  prefix = extract_known_prefix(image_files[0], prefix_map)
+  if not prefix:
+    print(f"⚠️  No matching prefix found for {image_files[0]}")
+    return None
+  photographer = prefix_map.get(prefix)
+  if not photographer:
+    print(f"⚠️  No matching photographer found for prefix {prefix}")
+    return None
+
+
   # All matched: return the references
-  return prefix, start_time, end_time
+  return photographer, start_time, end_time
       
     
