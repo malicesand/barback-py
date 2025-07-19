@@ -6,6 +6,10 @@
 #   if true, return the MEID
 #   if no match, return none
 
+
+# DEPRECATED: Replaced by json_utils.py
+# This module is preserved for reference and export only support
+
 import csv
 from typing import Optional
 from datetime import datetime
