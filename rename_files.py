@@ -5,6 +5,10 @@ import subprocess
 from pathlib import Path
 from utils.photo_utils import get_first_and_last_data
 from utils.prefix_utils import load_prefix_map
+from utils.json_utils import load_schedule
+from utils.match import match_photo_to_event
+
+# schedule = load_schedule()
 
 VOLUMES_ROOT = "/Volumes/"
 TSV_PATH = os.path.join(os.path.dirname(__file__), "data/metadata.tsv")
@@ -59,6 +63,8 @@ def main():
   
 def process_dcim(dcim_path, prefix_map):
   # Loop through each subfolder in the removable media
+  schedule_cache = {}
+
   for folder in os.listdir(dcim_path):
     dir_path = os.path.join(dcim_path, folder)
     if not os.path.isdir(dir_path):
@@ -75,8 +81,13 @@ def process_dcim(dcim_path, prefix_map):
     print(f"\tPhotographer: {photographer}")
     print(f"\tRange: {start_time} -> {end_time}")
 
+    if photographer not in schedule_cache:
+      schedule_cache[photographer] = load_schedule(photographer)
+
+    schedule = schedule_cache[photographer]  
+
     # Match the folder's metadata to a row in the TSV
-    match = match_tsv_row(TSV_PATH, photographer, start_time, end_time)
+    match = match_photo_to_event(schedule, start_time, end_time)
     if match: 
       print(f"\t👾 Matched MEID: {match}")
       # new_path = os.path.join(MEDIA_ROOT, match)
@@ -116,7 +127,7 @@ def process_dcim(dcim_path, prefix_map):
         except Exception as e:
           print(f"\t  ❌ Error while merging folders: {e}")
     else:
-      print("\t🙈 No matching entry in the TSV")
+      print("\t🙈 No matching entry in the Photographer's Schedule")
       # Rename folder to add "_UNMATCHED"
       unmatched_name = f"{folder}_UNMATCHED"
       new_path = os.path.join(os.path.dirname(dir_path), unmatched_name)
