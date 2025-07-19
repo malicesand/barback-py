@@ -3,9 +3,8 @@ import csv
 import sys
 import subprocess
 from pathlib import Path
-from photo_utils import get_first_and_last_data
-from tsv_utils import match_tsv_row
-from prefix_utils import load_prefix_map
+from utils.photo_utils import get_first_and_last_data
+from utils.prefix_utils import load_prefix_map
 
 VOLUMES_ROOT = "/Volumes/"
 TSV_PATH = os.path.join(os.path.dirname(__file__), "data/metadata.tsv")
