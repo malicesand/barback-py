@@ -11,7 +11,7 @@ from utils.match import match_photo_to_event
 # schedule = load_schedule()
 
 VOLUMES_ROOT = "/Volumes/"
-TSV_PATH = os.path.join(os.path.dirname(__file__), "data/metadata.tsv")
+# TSV_PATH = os.path.join(os.path.dirname(__file__), "data/metadata.tsv")
 LOG_PATH = 'run_log.csv'
 
 # Helper function for logging progress and status to csv
