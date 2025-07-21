@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 central = timezone(timedelta(hours=-5))
+margin = timedelta(minutes=10)
 
 def match_photo_to_event(schedule: dict, photo_start: str, photo_end: str) -> Optional[str]:
   try: 
@@ -14,7 +15,7 @@ def match_photo_to_event(schedule: dict, photo_start: str, photo_end: str) -> Op
     return None
   
   for meid, (event_start, event_end) in schedule.items():
-    if event_start <= photo_start_dt and photo_end_dt <= event_end:
+    if (event_start  - margin) <= photo_start_dt  and photo_end_dt <= (event_end + margin):
       return meid
     
   return None
