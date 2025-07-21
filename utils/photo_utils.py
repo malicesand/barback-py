@@ -7,7 +7,7 @@ import time #for exiftool throttling
 # Functions: Get all image files in a directory
 def get_image_files(dir_path: str) -> List[str]:
   # For loop through the folder
-  # Return a list of files ending in (.NEF, .CR2, .ARW, .RAF, .jpg, .png)
+  # Return a list of files ending in (.NEF, .CR2, .ARW, .RAF, .jpg, .png, .CR3)
   return [
     f for f in os.listdir(dir_path)
     if f.endswith(('.NEF', '.CR2', '.ARW', '.RAF', '.jpg', '.png', '.CR3'))
@@ -61,7 +61,6 @@ def get_first_and_last_data(dir_path: str, prefix_map: dict) -> Optional[Tuple[s
 
   # Sort image files so first and last match capture order
   image_files.sort()
-  #! Create loop to ignore other types of files
   # for file in image_files:
   first_file = os.path.join(dir_path, image_files[0])
   last_file = os.path.join(dir_path, image_files[-1])
