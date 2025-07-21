@@ -10,7 +10,7 @@ def get_image_files(dir_path: str) -> List[str]:
   # Return a list of files ending in (.NEF, .CR2, .ARW, .RAF, .jpg, .png)
   return [
     f for f in os.listdir(dir_path)
-    if f.endswith(('.NEF', '.CR2', '.ARW', '.RAF', '.jpg', '.png'))
+    if f.endswith(('.NEF', '.CR2', '.ARW', '.RAF', '.jpg', '.png', '.CR3'))
   ]
 
 # Function: Read date + photographer from ONE image file
