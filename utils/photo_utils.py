@@ -19,7 +19,7 @@ def get_metadata(filepath: str) -> Optional[str]:
   try:
     # Run exiftool to get DateTimeOriginal fields
     result = subprocess.run(
-      ['exiftool', '-DateTimeOriginal', filepath],
+      ['exiftool', '-EXIF:DateTimeOriginal', filepath],
       capture_output=True, text=True
     )
      # 50ms delay between calls
@@ -61,7 +61,8 @@ def get_first_and_last_data(dir_path: str, prefix_map: dict) -> Optional[Tuple[s
 
   # Sort image files so first and last match capture order
   image_files.sort()
-
+  #! Create loop to ignore other types of files
+  # for file in image_files:
   first_file = os.path.join(dir_path, image_files[0])
   last_file = os.path.join(dir_path, image_files[-1])
 
