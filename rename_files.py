@@ -58,7 +58,7 @@ def main():
     process_dcim(dcim_path, prefix_map)
 
     print(f"\n✅ Done! Processed: {drive_path}") 
-    subprocess.run(["open", drive_path])
+    # subprocess.run(["open", drive_path])
   # End of your loop, after everything is done
   # print(f"\n✅ Done! Opening folder in Finder: {VOLUMES_ROOT}") 
   # subprocess.run(["open", VOLUMES_ROOT])
@@ -141,8 +141,8 @@ def process_dcim(dcim_path, prefix_map):
       except Exception as e:
         print(f"\t   ❌ Failed to rename unmatched folder: {e}")
   
-  print(f"\n✅ Done! Opening folder in Finder: {dcim_path}")    
-  subprocess.run(["open", dcim_path])   
+  # print(f"\n✅ Done! Opening folder in Finder: {dcim_path}")    
+  # subprocess.run(["open", dcim_path])   
 
 if __name__ == "__main__":
   main()

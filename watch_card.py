@@ -5,7 +5,7 @@ import time
 import subprocess
 
 # === CONFIG ===
-IGNORE_LIST = {'Macintosh HD'}
+IGNORE_LIST = {'Macintosh HD', 'TOTC24 Backup', 'TOTC 2025 Raid', 'TOTC25 Temp', "AVCLUB's Mac Studio (7)"}
 SCRIPT_PATH = 'rename_files.py'
 DCIM_FOLDER_NAME = 'DCIM'
 POLL_INTERVAL = 5 # in seconds
