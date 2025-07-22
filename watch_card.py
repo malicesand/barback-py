@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 # === CONFIG ===
-IGNORE_LIST = {'macintosh hd', 'totc24 Backup', 'totc 2025 raid', 'totc25 temp', "avclub's mac studio (7)"}
+IGNORE_LIST = {'macintosh hd', 'totc24 Backup', 'totc 2025 raid', 'totc25 temp', "avclub's mac studio (7), 'totc edit"}
 SCRIPT_PATH = 'rename_files.py'
 DCIM_FOLDER_NAME = 'DCIM'
 POLL_INTERVAL = 5 # in seconds
