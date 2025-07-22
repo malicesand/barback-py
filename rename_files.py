@@ -36,7 +36,6 @@ def main():
 
   # load prefix map
   prefix_map = load_prefix_map("data/prefix.tsv")  
-
   # Access DCIM in Removable Media
   for drive in os.listdir(VOLUMES_ROOT):
     drive_path = os.path.join(VOLUMES_ROOT, drive)
@@ -58,7 +57,7 @@ def main():
     process_dcim(dcim_path, prefix_map)
 
     print(f"\n✅ Done! Processed: {drive_path}") 
-    # subprocess.run(["open", drive_path])
+    subprocess.run(["open", dcim_path])
   # End of your loop, after everything is done
   # print(f"\n✅ Done! Opening folder in Finder: {VOLUMES_ROOT}") 
   # subprocess.run(["open", VOLUMES_ROOT])

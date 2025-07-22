@@ -3,9 +3,10 @@
 import os
 import time
 import subprocess
+from pathlib import Path
 
 # === CONFIG ===
-IGNORE_LIST = {'Macintosh HD', 'TOTC24 Backup', 'TOTC 2025 Raid', 'TOTC25 Temp', "AVCLUB's Mac Studio (7)"}
+IGNORE_LIST = {'macintosh hd', 'totc24 Backup', 'totc 2025 raid', 'totc25 temp', "avclub's mac studio (7)"}
 SCRIPT_PATH = 'rename_files.py'
 DCIM_FOLDER_NAME = 'DCIM'
 POLL_INTERVAL = 5 # in seconds
@@ -31,8 +32,10 @@ def show_dialog(volume_name):
 def run_script(volume_path):
   try: 
     subprocess.run(['python3', SCRIPT_PATH, volume_path])
+    #marker file
+    Path(os.path.join(volume_path, '.renamed')).touch()
   except Exception as e:
-    print('😨 Failed to run renamer:', e)
+    print('😨 Failed to run re-namer:', e)
 
 def main():
   print(' 🧿 Watching for memory cards with DCIM folders 🧿')
@@ -41,12 +44,23 @@ def main():
     try: 
       volumes = os.listdir('/Volumes')
       for vol in volumes:
-        if vol in IGNORE_LIST or vol in already_prompted:
-          continue
-
+        vol_lower = vol.lower()
         vol_path = os.path.join('/Volumes', vol)
         dcim_path = os.path.join(vol_path, DCIM_FOLDER_NAME)
+        renamed_marker = os.path.join(vol_path, '.renamed')
 
+        if vol_lower in IGNORE_LIST:
+          print(f'Skipping {vol} (in IGNORE_LIST)')
+          continue
+
+        if os.path.exists(renamed_marker):
+          print(f'Skipping {vol} (already renamed)')
+          continue
+
+        # vol_path = os.path.join('/Volumes', vol)
+        # dcim_path = os.path.join(vol_path, DCIM_FOLDER_NAME)
+
+        
         if os.path.isdir(dcim_path):
           print(f'\n 👁️‍🗨️ Found DCIM on {vol}')
           if show_dialog(vol):
@@ -54,9 +68,9 @@ def main():
           already_prompted.add(vol)
 
       # Reset prompted list if volume is unmounted
-      already_prompted = {
-        vol for vol in already_prompted if os.path.exists(os.path.join('/Volumes', vol))
-      }
+      # already_prompted = {
+      #   vol for vol in already_prompted if os.path.exists(os.path.join('/Volumes', vol))
+      # }
 
     except Exception as e:
       print('🫣 Watcher error:', e)
