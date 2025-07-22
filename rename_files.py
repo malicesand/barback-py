@@ -44,12 +44,12 @@ def main():
 
     # Skip system volume 
     if drive.lower() in IGNORE_LIST or not os.path.isdir(drive_path):
-      print(f'Skipping ignored volume: {drive}')
+      print(f'👾 Skipping ignored volume: {drive}')
       continue
 
     if os.path.exists(marker_path):
-      print(f'Skipping {drive} (already has .renamed marker)')
-      
+      print(f'👾 Skipping {drive} (already has .renamed marker)')
+
     # Go one level deeper  
     dcim_path = os.path.join(drive_path, 'DCIM')
 

@@ -50,11 +50,11 @@ def main():
         renamed_marker = os.path.join(vol_path, '.renamed')
 
         if vol_lower in IGNORE_LIST:
-          print(f'Skipping {vol} (in IGNORE_LIST)')
+          # print(f'Skipping {vol} (in IGNORE_LIST)')
           continue
 
         if os.path.exists(renamed_marker):
-          print(f'Skipping {vol} (already renamed)')
+          print(f'🛸 Skipping {vol} (already renamed)')
           continue
 
         # vol_path = os.path.join('/Volumes', vol)
