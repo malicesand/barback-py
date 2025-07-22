@@ -7,6 +7,7 @@ from utils.photo_utils import get_first_and_last_data
 from utils.prefix_utils import load_prefix_map
 from utils.json_utils import load_schedule
 from utils.match import match_photo_to_event
+from watch_card import IGNORE_LIST
 
 # schedule = load_schedule()
 
@@ -39,11 +40,16 @@ def main():
   # Access DCIM in Removable Media
   for drive in os.listdir(VOLUMES_ROOT):
     drive_path = os.path.join(VOLUMES_ROOT, drive)
+    marker_path = os.path.join(drive_path, '.renamed')
 
     # Skip system volume 
-    if drive == "Macintosh HD" or not os.path.isdir(drive_path):
+    if drive.lower() in IGNORE_LIST or not os.path.isdir(drive_path):
+      print(f'Skipping ignored volume: {drive}')
       continue
 
+    if os.path.exists(marker_path):
+      print(f'Skipping {drive} (already has .renamed marker)')
+      
     # Go one level deeper  
     dcim_path = os.path.join(drive_path, 'DCIM')
 
