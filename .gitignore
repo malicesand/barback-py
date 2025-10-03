@@ -16,6 +16,11 @@ __pycache__/
 .pytest_cache/
 .coverage
 .mypy_cache/
+.dmypy.json
+.pyre/
+
+# Ruff
+.ruff_cache/
 
 # Data files
 data/*.tsv
@@ -28,3 +33,8 @@ data/*.json
 run_log.csv
 logs/
 *.log
+
+# Node / Electron (when you add the desktop app)
+apps/desktop/node_modules/
+apps/desktop/dist/
+apps/desktop/out/
