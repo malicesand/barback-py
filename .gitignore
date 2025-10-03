@@ -23,3 +23,8 @@ data/*.json
 
 # Output
 *.out
+
+# logs / runtime artifacts
+run_log.csv
+logs/
+*.log
