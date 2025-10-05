@@ -12,11 +12,11 @@ const __dirname = path.dirname(__filename);
 //TODO theme stuff 
 // // const isDark = nativeTheme.shouldUseDarkColors;
 
-ipcMain.handle("ping", () => ({
-  msg: "pong from main",
-  electron: process.versions.electron,
-  pid: process.pid,
-}));
+// ipcMain.handle("ping", () => ({
+//   msg: "pong from main",
+//   electron: process.versions.electron,
+//   pid: process.pid,
+// }));
 
 // register this before or inside app.whenReady(), but before the renderer invokes it
 // ipcMain.handle('py:send', (_evt, payload) => {
@@ -25,12 +25,14 @@ ipcMain.handle("ping", () => ({
 //   // return something to the renderer:
 //   return true; // or { ok: true }
 // });
-ipcMain.handle('py:send', async (_evt, payload) => {
-  // pretend we sent it to Python
-  // you could even echo a fake event back to the renderer:
-  win?.webContents.send('py:event', { type: 'echo', payload });
-  return { ok: true };
-});
+
+// ipcMain.handle('py:send', async (_evt, payload) => {
+//   // pretend we sent it to Python
+//   // you could even echo a fake event back to the renderer:
+//   win?.webContents.send('py:event', { type: 'echo', payload });
+//   console.log('[py:send] got payload from renderer:', payload);
+//   return { ok: true };
+// });
 
 // Ensure only one instance of the app runs
 const gotLock = app.requestSingleInstanceLock();
@@ -55,7 +57,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
-    // backgroundColor: '#00000001',
+    backgroundColor: '#00000001',
     // transparent: true,
     // titleBarStyle: 'hiddenInset',
     // vibrancy: 'under-window',
@@ -74,36 +76,34 @@ function createWindow() {
     win.loadFile(path.join(__dirname, '../index.html'));
   }
 
-  //  win.loadFile(path.join(__dirname, '../index.html'));
-
   win.on('closed', () => (win = null));
 }
 
 // Python Launch Code
 function spawnPython() {
-  // Python version
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  const scriptPath = path.join(__dirname, '../../../barback/services/watch_card.py')
+
   // Python to access on open
-  // py = spawn(pythonCmd, [path.join(__dirname, '../../../barback/services/watch_card.py')], {
-    // stdio: ['pipe', 'pipe', 'pipe'],
-  py = spawn(pythonCmd, [path.join(__dirname, '../../../barback/watcher.py')], {
+  py = spawn(pythonCmd, [scriptPath], {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
-
   // Parse stdout as NDJSON
-  const rl = readline.createInterface({ input: py.stdout});
+  const rl = readline.createInterface({ input: py.stdout });
   rl.on('line', (line) => {
     try {
       const msg = JSON.parse(line);
-      if (win) win.webContents.send('py: event', msg);
-    } catch (e) {
-      if (win) win.webContents.send('py: event', { type: 'error', error: 'invalid_json', raw: line });
+      if (win) win.webContents.send('py:event', msg);
+    } catch {
+      if (win) win.webContents.send('py:event', { type: 'error', error: 'invalid_json', raw: line });
+      //!If Python prints anything non-JSON, forward as a debug event
+      // win?.webContents.send('py:event', { type: 'debug', line });
     }
   })
 
   py.stderr.on('data', (buf) => {
-    const text = buf.toString();
+    const text = String(buf);
     if (win) win.webContents.send('py:stderr', text);
     console.error('[PY STDERR]', text);
   });
@@ -113,6 +113,15 @@ function spawnPython() {
     if (win) win.webContents.send('py:event', { type: 'py_exit', code, signal });
     py = null;
   });
+
+  // Renderer -> Python (JSON per)
+  ipcMain.handle('py:send', (_evt, payload: unknown) => {
+    if (!py) throw new Error('Python not running');
+    py.stdin.write(JSON.stringify(payload) + '\n');
+    return true;
+  });
+
+  ipcMain.handle('ping', () => 'pong');
 };
 
 // Open Window
@@ -124,16 +133,16 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 
-  // renderer -> python (send command objects)
-  ipcMain.handle('py:send', (_evt, payload: unknown) => {
-    if (!py || !py.stdin.writable) return false;
-    try {
-      py.stdin.write(JSON.stringify(payload) + '\n');
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  // // renderer -> python (send command objects)
+  // ipcMain.handle('py:send', (_evt, payload: unknown) => {
+  //   if (!py || !py.stdin.writable) return false;
+  //   try {
+  //     py.stdin.write(JSON.stringify(payload) + '\n');
+  //     return true;
+  //   } catch {
+  //     return false;
+  //   }
+  // });
 
   app.on('before-quit', () => {
     try { py?.kill(); } catch {}

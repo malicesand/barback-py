@@ -3,10 +3,10 @@ import csv
 import sys
 import subprocess
 from pathlib import Path
-from utils.photo_utils import get_first_and_last_data
-from utils.prefix_utils import load_prefix_map
-from utils.json_utils import load_schedule
-from utils.match import match_photo_to_event
+from core.photo_utils import get_first_and_last_data
+from core.prefix_utils import load_prefix_map
+from core.json_utils import load_schedule
+from core.match import match_photo_to_event
 from watch_card import IGNORE_LIST
 
 # schedule = load_schedule()

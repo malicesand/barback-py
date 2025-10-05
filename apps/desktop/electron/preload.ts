@@ -1,3 +1,13 @@
+/* import { contextBridge, ipcRenderer } from 'electron';
+
+contextBridge.exposeInMainWorld('py', {
+  onEvent: (cb: (msg: any) => void) =>
+    ipcRenderer.on('py:event', (_e, msg) => cb(msg)),
+  send: (payload: unknown) => ipcRenderer.invoke('py:send', payload),
+}); */
+
+
+
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
 type PyListener = (event: unknown) => void;

@@ -1,4 +1,4 @@
-import { ipcMain, app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { spawn } from "child_process";
 import readline from "readline";
@@ -7,15 +7,6 @@ let py = null;
 let win = null;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-ipcMain.handle("ping", () => ({
-  msg: "pong from main",
-  electron: process.versions.electron,
-  pid: process.pid
-}));
-ipcMain.handle("py:send", async (_evt, payload) => {
-  win?.webContents.send("py:event", { type: "echo", payload });
-  return { ok: true };
-});
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -35,7 +26,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
-    // backgroundColor: '#00000001',
+    backgroundColor: "#00000001",
     // transparent: true,
     // titleBarStyle: 'hiddenInset',
     // vibrancy: 'under-window',
@@ -56,20 +47,22 @@ function createWindow() {
 }
 function spawnPython() {
   const pythonCmd = process.platform === "win32" ? "python" : "python3";
-  py = spawn(pythonCmd, [path.join(__dirname, "../../../barback/watcher.py")], {
+  const scriptPath = path.join(__dirname, "../../../barback/services/watch_card.py");
+  py = spawn(pythonCmd, [scriptPath], {
     stdio: ["pipe", "pipe", "pipe"]
   });
   const rl = readline.createInterface({ input: py.stdout });
   rl.on("line", (line) => {
     try {
       const msg = JSON.parse(line);
-      if (win) win.webContents.send("py: event", msg);
-    } catch (e) {
-      if (win) win.webContents.send("py: event", { type: "error", error: "invalid_json", raw: line });
+      if (win) win.webContents.send("py:event", msg);
+    } catch {
+      if (win) win.webContents.send("py:event", { type: "error", error: "invalid_json", raw: line });
+      //!If Python prints anything non-JSON, forward as a debug event
     }
   });
   py.stderr.on("data", (buf) => {
-    const text = buf.toString();
+    const text = String(buf);
     if (win) win.webContents.send("py:stderr", text);
     console.error("[PY STDERR]", text);
   });
@@ -78,21 +71,18 @@ function spawnPython() {
     if (win) win.webContents.send("py:event", { type: "py_exit", code, signal });
     py = null;
   });
+  ipcMain.handle("py:send", (_evt, payload) => {
+    if (!py) throw new Error("Python not running");
+    py.stdin.write(JSON.stringify(payload) + "\n");
+    return true;
+  });
+  ipcMain.handle("ping", () => "pong");
 }
 app.whenReady().then(() => {
   createWindow();
   spawnPython();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-  ipcMain.handle("py:send", (_evt, payload) => {
-    if (!py || !py.stdin.writable) return false;
-    try {
-      py.stdin.write(JSON.stringify(payload) + "\n");
-      return true;
-    } catch {
-      return false;
-    }
   });
   app.on("before-quit", () => {
     try {

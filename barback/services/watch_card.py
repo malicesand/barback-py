@@ -9,7 +9,14 @@ from pathlib import Path
 from threading import Thread
 
 # === CONFIG ===
-IGNORE_LIST = {'macintosh hd', 'totc24 Backup', 'totc 2025 raid', 'totc25 temp', "avclub's mac studio (7), 'totc edit"} #! update with Josh
+IGNORE_LIST = { #! update with Josh
+   'macintosh hd', 
+   'totc24 Backup', 
+   'totc 2025 raid', 
+   'totc25 temp', 
+   "avclub's mac studio (7)", 
+   'totc edit'
+} 
 SESSION_IGNORES = set()
 SCRIPT_PATH = 'rename_files.py'
 DCIM_FOLDER_NAME = 'DCIM'
@@ -33,23 +40,28 @@ def run_script(volume_path):
         send_event("rename_finished", volume_path=volume_path, ok=False, error=str(e))
     except Exception as e:
         send_event("rename_finished", volume_path=volume_path, ok=False, error=str(e))
+    finally:
+       # force-refresh dcim list
+       send_event("dcim_snapshot", cards=relevant_cards_snapshot())
 
-def list_volumes_state():
-   snapshot = []
+# Photo Cards
+def relevant_cards_snapshot():
+   cards = []
    for vol in os.listdir('/Volumes'):
         vol_lower = vol.lower()
+        if (vol_lower in IGNORE_LIST) or (vol_lower in SESSION_IGNORES):
+            continue
         vol_path = os.path.join('/Volumes', vol)
         dcim_path = os.path.join(vol_path, DCIM_FOLDER_NAME)
         renamed_marker = os.path.join(vol_path, '.renamed')
-        snapshot.append({
-            "name": vol,
-            "path": vol_path,
-            "ignored": (vol_lower in IGNORE_LIST) or (vol_lower in SESSION_IGNORES),
-            "has_dcim": os.path.isdir(dcim_path),
-            "renamed": os.path.exists(renamed_marker),
-        })
-   return snapshot
-
+        if os.path.isdir(dcim_path) and not os.path.exists(renamed_marker):
+           cards.append({
+              'volume_name': vol,
+              'volume_path': vol_path,
+              'dcim_path': dcim_path,
+           })
+   return cards
+   
 def stdin_command_loop():
    """
     Read newline-delimited JSON commands from stdin.
@@ -86,8 +98,8 @@ def stdin_command_loop():
           if name and name in SESSION_IGNORES:
              SESSION_IGNORES.remove(name)
              send_event('unignored', volume_name=name)
-       elif cmd == 'list_volumes':
-          send_event('volumes', snapshot=list_volumes_state())
+       elif cmd == 'list_dcim':
+          send_event('dcim_snapshot', cards=relevant_cards_snapshot())
        else:
           send_event('error', message='Unknown command', payload=data)
     except Exception as e:
@@ -96,39 +108,19 @@ def stdin_command_loop():
 
 def main():
   send_event('ready', message='Watching for memory cards with DCIM folders')
-  already_prompted = set()
+  last_names = set()
 
   #Start stdin command reader in a background thread
+  t = Thread(target=stdin_command_loop, daemon=True)
+  t.start()
+  
   while True:
     try: 
-      volumes = os.listdir('/Volumes')
-      for vol in volumes:
-        vol_lower = vol.lower()
-        vol_path = os.path.join('/Volumes', vol)
-        dcim_path = os.path.join(vol_path, DCIM_FOLDER_NAME)
-        renamed_marker = os.path.join(vol_path, '.renamed')
-
-        if (vol_lower in IGNORE_LIST) or (vol_lower in SESSION_IGNORES):
-          # print(f'Skipping {vol} (in IGNORE_LIST)')
-          continue
-
-        if os.path.exists(renamed_marker):
-          continue
-        
-        if os.path.isdir(dcim_path) and vol not in already_prompted:
-           # Tell the UI a DCIM card has appeared; UI will decide to run or cancel
-          send_event(
-             'dcim_found',
-             volume_name=vol,
-             volume_path=vol_path,
-             dcim_path=dcim_path,
-          )
-          already_prompted.add(vol)
-
-      # Drop from prompted set when a volume disappears
-        still_mounted = set(os.listdir('/Volumes'))
-        already_prompted = {v for v in already_prompted if v in still_mounted}
-
+      cards = relevant_cards_snapshot()
+      names = {c['volume_name'] for c in cards}
+      if names != last_names:
+         send_event('dcim_snapshot', cards=cards)
+         last_names = names
     except Exception as e:
       print('🫣 Watcher error:', e)
 

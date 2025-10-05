@@ -1,33 +1,28 @@
+# barback/cli.py
 import argparse
 import sys
-
-from barback import rename_files  # TODO own logic
+from barback import rename_files, thumbs
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Barback: photo ingest & renaming utility"
-    )
-    parser.add_argument(
-        "path", 
-        nargs="?", 
-        default=".", 
-        help="Path to photos folder (default: current directory)"
-    )
-    parser.add_argument(
-        "--log", 
-        action="store_true", 
-        help="Write a run log"
-    )
-    args = parser.parse_args()
+    p = argparse.ArgumentParser(prog="barback")
+    sub = p.add_subparsers(dest="cmd", required=True)
 
-    # Call into your code
+    r = sub.add_parser("rename"); r.add_argument("path")
+    t = sub.add_parser("thumbs"); t.add_argument("path")
+
+    args = p.parse_args()
     try:
-        rename_files.run(path=args.path, log=args.log)  # TODO adjust to function
-        print(f"✅ Successfully processed {args.path}")
+        if args.cmd == "rename":
+            rename_files.run(path=args.path)
+        elif args.cmd == "thumbs":
+            thumbs.build(path=args.path)
     except Exception as e:
-        print(f"❌ Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
+        print(f"❌ {e}", file=sys.stderr); sys.exit(1)
 
 if __name__ == "__main__":
     main()
+'''
+Electron call:
+spawn(pythonCmd, ['-m', 'barback.cli', 'rename', volumePath], {stdio:['pipe','pipe','pipe']});
+
+'''
