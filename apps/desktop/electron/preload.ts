@@ -1,5 +1,27 @@
-import { contextBridge, ipcRenderer } from 'electron';
-//TODO learn about context bridge and global variables
-contextBridge.exposeInMainWorld('barback', {
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+
+type PyListener = (event: unknown) => void;
+
+const PyListeners = new Set<PyListener>();
+
+ipcRenderer.on('py:event', (_e: IpcRendererEvent, data: unknown) => {
+  for (const fn of PyListeners) fn(data);
+})
+
+console.log('[preload] running:', 'index.html');
+
+contextBridge.exposeInMainWorld('pybridge', {
+  sendToPython(payload: unknown) {
+    return ipcRenderer.invoke('py:send', payload);
+  },
+  onPythonEvent(listener: PyListener) {
+    PyListeners.add(listener);
+    return () => PyListeners.delete(listener); // unsubscribe function
+  },
+  onPythonStderr(cb: (chunk: string) => void) {
+    const handler = (__e: IpcRendererEvent, chunk: string) => cb(chunk);
+    ipcRenderer.on('py:stderr', handler);
+    return () => ipcRenderer.off('py:stderr', handler);
+  },
   ping: () => ipcRenderer.invoke('ping'),
 });

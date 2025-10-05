@@ -1,6 +1,11 @@
+// Global Types
 declare global {
   interface Window {
-    barback: { ping: () => Promise<{ msg: string; electron: string; pid: number }> };
+    pybridge?: {
+      sendToPython: (payload: unknown) => Promise<boolean>;
+      onPythonEvent: (listener: (event: any) => void) => () => void;
+      onPythonStderr: (cb: (chunk: string) => void) => () => void;
+    };
   }
 }
 export {};
