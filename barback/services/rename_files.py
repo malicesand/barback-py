@@ -13,7 +13,7 @@ from watch_card import IGNORE_LIST
 
 VOLUMES_ROOT = "/Volumes/"
 # TSV_PATH = os.path.join(os.path.dirname(__file__), "data/metadata.tsv")
-LOG_PATH = 'run_log.csv'
+LOG_PATH = 'run_log.csv' 
 
 # Helper function for logging progress and status to csv
 def write_log_row(folder, prefix, start, end, result, status):
@@ -25,15 +25,10 @@ def write_log_row(folder, prefix, start, end, result, status):
         writer.writerow([folder, prefix, start, end, result, status])
 
 def main():
-  # Log check
-  # print("📂 All volumes:")
-  # for d in os.listdir(VOLUMES_ROOT):
-  #   print(f"  - {d}")
-
   # Language for dialog box
   base_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
   dcim_path = base_dir / 'DCIM'
-  print(f'Renaming files in {dcim_path}')
+  print(f'Renaming folders in {dcim_path}')
 
   # load prefix map
   prefix_map = load_prefix_map("data/prefix.tsv")  
@@ -66,12 +61,11 @@ def main():
     subprocess.run(["open", dcim_path])
   # End of your loop, after everything is done
   # print(f"\n✅ Done! Opening folder in Finder: {VOLUMES_ROOT}") 
-  # subprocess.run(["open", VOLUMES_ROOT])
+  # subprocess.run(["open", VOLUMES_ROOT]) 
   
 def process_dcim(dcim_path, prefix_map):
   # Loop through each subfolder in the removable media
   schedule_cache = {}
-
   for folder in os.listdir(dcim_path):
     dir_path = os.path.join(dcim_path, folder)
     if not os.path.isdir(dir_path):

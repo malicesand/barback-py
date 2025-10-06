@@ -2,6 +2,7 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+import CardsPanel from './components/cardsPanel.tsx';
 // import { usePythonEvents } from './usePythonEvents';
 
 // function App() {
@@ -67,31 +68,27 @@ import './App.css'
 //   );
 // }
 // export default App
-import { usePythonEvents } from './usePythonEvents';
+// import { usePythonEvents } from './usePythonEvents';
 
 export default function App() {
-  const { events, send, hasBridge } = usePythonEvents();
+  // const { events, send } = usePythonEvents();
 
   return (
     <div style={{ padding: 16, fontFamily: 'system-ui' }}>
       <h1>Python Bridge Demo</h1>
-
-      {!hasBridge && (
-        <p style={{ color: 'crimson' }}>
-          Bridge not available. Is your <code>preload.js</code> loaded in BrowserWindow?
-        </p>
-      )}
-
       <div>
+        <CardsPanel/>
+      </div>
+      {/* <div>
         <button onClick={() => send({ command: 'ping' })}>Ping</button>
         <button onClick={() => send({ command: 'check_volumes' })}>Check Volumes</button>
         <button onClick={() => send({ command: 'start_watch' })}>Start Watch</button>
         <button onClick={() => send({ command: 'stop_watch' })}>Stop Watch</button>
-      </div>
+      </div> */}
 
-      <pre style={{ background: '#111', color: '#ddd', padding: 12, borderRadius: 8, maxHeight: 400, overflow: 'auto' }}>
+      {/* <pre style={{ background: '#111', color: '#ddd', padding: 12, borderRadius: 8, maxHeight: 400, overflow: 'auto' }}>
 {events.map(e => JSON.stringify(e, null, 2)).join('\n')}
-      </pre>
+      </pre> */}
     </div>
   );
 }
