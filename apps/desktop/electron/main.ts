@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import path from 'node:path';
+import * as path from 'node:path';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import readline from 'readline';
 import { fileURLToPath } from "node:url";
+
 
 let py: import('child_process').ChildProcessWithoutNullStreams | null = null;
 let win: BrowserWindow | null = null;
@@ -82,7 +83,7 @@ function createWindow() {
 // Python Launch Code
 function spawnPython() {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-  const scriptPath = path.join(__dirname, '../../../barback/services/watch_card.py')
+  const scriptPath = path.join(__dirname, '../../../py-project/watch_card.py')
 
   // Python to access on open
   py = spawn(pythonCmd, [scriptPath], {

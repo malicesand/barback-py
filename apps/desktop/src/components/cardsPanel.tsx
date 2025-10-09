@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-// import { Card, Folders } from '../global.d.ts'
-import {type Card, type DcimFolder} from '../global.d.ts'
+import { type Card, type DcimFolder } from '../global.d.ts'
 
 
 function formatBytes(n?: number | null) {

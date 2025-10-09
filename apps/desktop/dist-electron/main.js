@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain } from "electron";
-import path from "node:path";
+import * as path from "node:path";
 import { spawn } from "child_process";
 import readline from "readline";
 import { fileURLToPath } from "node:url";
@@ -47,7 +47,7 @@ function createWindow() {
 }
 function spawnPython() {
   const pythonCmd = process.platform === "win32" ? "python" : "python3";
-  const scriptPath = path.join(__dirname, "../../../barback/services/watch_card.py");
+  const scriptPath = path.join(__dirname, "../../../py-project/watch_card.py");
   py = spawn(pythonCmd, [scriptPath], {
     stdio: ["pipe", "pipe", "pipe"]
   });

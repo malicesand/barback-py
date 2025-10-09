@@ -11,6 +11,7 @@ from threading import Thread
 from threading import Event
 
 
+
 # ---- Config / Globals --------------------------------
 IGNORE_LIST = { #! update with Josh
    'macintosh hd', 
@@ -21,25 +22,25 @@ IGNORE_LIST = { #! update with Josh
    'totc edit'
 } 
 SESSION_IGNORES = set()
-SCRIPT_PATH = 'rename_files.py'
+# SCRIPT_PATH = 'rename_files.py'
 DCIM_FOLDER_NAME = 'DCIM'
 POLL_INTERVAL = 5 # in seconds
 SESSION_LOCK = threading.Lock() # protect SESSION_IGNORES
 
 # ---- resolve absolute path to renamer script -----------------------
-def _find_repo_root():
-   here = Path(__file__).resolve()
-   for p in [here] + list(here.parents):
-      if (p / 'pyproject.toml').exists() or (p / '.git').exists():
-         return p
-   return here.parent
+# def _find_repo_root():
+#    here = Path(__file__).resolve()
+#    for p in [here] + list(here.parents):
+#       if (p / 'pyproject.toml').exists() or (p / '.git').exists():
+#          return p
+#    return here.parent
 
-REPO_ROOT = _find_repo_root()
+# REPO_ROOT = _find_repo_root()
 
 # Candidates that match repo layout
-_SCRIPT_CANDIDATES = [
-   REPO_ROOT / 'barback' / 'core' / 
-]
+# _SCRIPT_CANDIDATES = [
+#    REPO_ROOT / 'barback' / 'core' / 
+# ]
 # ---- Utilities -----------------------------------------------------
 
 def send_event(type_, **payload):
@@ -119,18 +120,35 @@ def list_dcim_folders(dcim_path: str, include_counts=True, max_entries=500):
     rows.sort(key=lambda r: _natural_key(r['name']))
     return rows[:max_entries]
 
+HERE = Path(__file__).resolve().parent
+SCRIPT_PATH = HERE / 'rename_files.py'
 def run_script(volume_path):
     try:
         send_event("rename_started", volume_path=volume_path)
-        # Call your existing renamer
-        subprocess.run(['python3', SCRIPT_PATH, volume_path], check=True)
-        # Marker file so we don't re-run
-        Path(os.path.join(volume_path, '.renamed')).touch()
-        send_event("rename_finished", volume_path=volume_path, ok=True)
-    except subprocess.CalledProcessError as e:
-        send_event("rename_finished", volume_path=volume_path, ok=False, error=str(e))
-    except Exception as e:
-        send_event("rename_finished", volume_path=volume_path, ok=False, error=str(e))
+
+        if not SCRIPT_PATH.exists():
+           send_event('rename_finished', volume_path=volume_path, ok=False, error=f'rename not found at {SCRIPT_PATH}')
+           return
+        # import siblings
+        env = os.environ.copy()
+        env['PYTHONPATH'] = os.pathsep.join([str(HERE), env.get('PYTHONPATH', '')])
+
+        try: 
+           subprocess.run(
+              [sys.executable, "-u", "-m", "rename_files", volume_path],
+              cwd=str(HERE), # anchor working directory
+              env=env,
+              check=True,
+              stdout=subprocess.DEVNULL,  # don't pollute JSON stdout
+              stderr=sys.stderr,
+              text=True,
+           )
+           Path(os.path.join(volume_path, '.renamed')).touch()
+           send_event("rename_finished", volume_path=volume_path, ok=True)
+        except subprocess.CalledProcessError as e:
+         send_event("rename_finished", volume_path=volume_path, ok=False, error=str(f'exit {e.returncode}'))
+        except Exception as e:
+         send_event("rename_finished", volume_path=volume_path, ok=False, error=str(e))
     finally:
        # force-refresh dcim list
        send_event("dcim_snapshot", cards=relevant_cards_snapshot())
