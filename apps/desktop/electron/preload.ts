@@ -1,13 +1,3 @@
-/* import { contextBridge, ipcRenderer } from 'electron';
-
-contextBridge.exposeInMainWorld('py', {
-  onEvent: (cb: (msg: any) => void) =>
-    ipcRenderer.on('py:event', (_e, msg) => cb(msg)),
-  send: (payload: unknown) => ipcRenderer.invoke('py:send', payload),
-}); */
-
-
-
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
 type PyListener = (event: unknown) => void;
@@ -29,7 +19,9 @@ contextBridge.exposeInMainWorld('pybridge', {
     return () => PyListeners.delete(listener); // unsubscribe function
   },
   onPythonStderr(cb: (chunk: string) => void) {
-    const handler = (__e: IpcRendererEvent, chunk: string) => cb(chunk);
+    const handler = (_e: IpcRendererEvent, chunk: string) => {
+      try { cb(String(chunk)); } catch (err) { console.error('[py:stderr cb error', err); }
+    };
     ipcRenderer.on('py:stderr', handler);
     return () => ipcRenderer.off('py:stderr', handler);
   },

@@ -57,6 +57,7 @@ export default function CardsPanel() {
           return;
       } 
   });
+
   // Initial fetch (support new + legacy)
   window.pybridge.sendToPython({ cmd: 'cards/snapshot' }).catch(() => {});
   window.pybridge.sendToPython({ cmd: 'list_dcim' }).catch(() => {});
@@ -67,6 +68,12 @@ export default function CardsPanel() {
   }) ?? (() => {});
 
   return () => { off(); offErr(); };
+}, []);
+
+  useEffect(() => {
+  return window.pybridge.onPythonStderr((line) => {
+    console.log('[py:stderr]', line); // check DevTools console
+  });
 }, []);
 
   // Actions 

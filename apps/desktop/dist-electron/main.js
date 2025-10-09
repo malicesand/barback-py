@@ -61,10 +61,17 @@ function spawnPython() {
       //!If Python prints anything non-JSON, forward as a debug event
     }
   });
-  py.stderr.on("data", (buf) => {
-    const text = String(buf);
-    if (win) win.webContents.send("py:stderr", text);
-    console.error("[PY STDERR]", text);
+  py.stderr.setEncoding("utf8");
+  let errBuf = "";
+  py.stderr.on("data", (chunk) => {
+    errBuf += chunk;
+    for (; ; ) {
+      const nl = errBuf.indexOf("\n");
+      if (nl < 0) break;
+      const line = errBuf.slice(0, nl).replace(/\r$/, "");
+      errBuf = errBuf.slice(nl + 1);
+      if (win) win.webContents.send("py:stderr", line);
+    }
   });
   py.on("exit", (code, signal) => {
     console.warn(`[PY EXIT] code=${code} signal=${signal}`);

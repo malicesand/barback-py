@@ -117,6 +117,7 @@ def list_dcim_folders(dcim_path: str, include_counts=True, max_entries=500):
         rows = []
 
     # natural sort by folder name commonly used by cameras (100MSDCF, 101MSDCF…)
+    
     rows.sort(key=lambda r: _natural_key(r['name']))
     return rows[:max_entries]
 
@@ -135,14 +136,17 @@ def run_script(volume_path):
 
         try: 
            subprocess.run(
-              [sys.executable, "-u", "-m", "rename_files", volume_path],
+            #   [sys.executable, "-u", "-m", "rename_files", volume_path],
+              [sys.executable, "-u", str(SCRIPT_PATH), volume_path],
               cwd=str(HERE), # anchor working directory
               env=env,
               check=True,
-              stdout=subprocess.DEVNULL,  # don't pollute JSON stdout
+            #   stdout=subprocess.DEVNULL,  # don't pollute JSON stdout
+              stdout=sys.stderr,
               stderr=sys.stderr,
               text=True,
            )
+           sys.stderr.write(f"[WATCHER] run_script → {SCRIPT_PATH} cwd={HERE} target={volume_path}\n"); sys.stderr.flush()
            Path(os.path.join(volume_path, '.renamed')).touch()
            send_event("rename_finished", volume_path=volume_path, ok=True)
         except subprocess.CalledProcessError as e:

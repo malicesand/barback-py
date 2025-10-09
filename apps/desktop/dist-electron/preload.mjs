@@ -14,7 +14,13 @@ electron.contextBridge.exposeInMainWorld("pybridge", {
     return () => PyListeners.delete(listener);
   },
   onPythonStderr(cb) {
-    const handler = (__e, chunk) => cb(chunk);
+    const handler = (_e, chunk) => {
+      try {
+        cb(String(chunk));
+      } catch (err) {
+        console.error("[py:stderr cb error", err);
+      }
+    };
     electron.ipcRenderer.on("py:stderr", handler);
     return () => electron.ipcRenderer.off("py:stderr", handler);
   },
