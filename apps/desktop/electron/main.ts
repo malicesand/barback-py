@@ -3,7 +3,86 @@ import * as path from 'node:path';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import readline from 'readline';
 import { fileURLToPath } from "node:url";
+import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
+import fs from 'node:fs/promises';
+import keytar from 'keytar';
 
+// --- Google Auth -------------------------------------------------------
+const SERVICE_NAME = 'Calendar-Connect';
+const ACCOUNT_NAME = 'google-oauth-token';
+const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
+
+// Load Desktop OAuth client (client_id, 'secret' ignored)
+async function loadClientJSON() {
+  const credPath = path.join(process.resourcesPath, 'oauth_client.json');
+  try {
+    return JSON.parse(await fs.readFile(credPath, 'utf8'));
+  } catch {
+    // dev fallback
+    const devPath = path.join(process.cwd(), 'credentials/oauth_client.json');
+    return JSON.parse(await fs.readFile(devPath, 'utf8'));
+  }
+}
+
+// Restore tokens (if any)
+async function loadTokens(): Promise<any | null> {
+  const json = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
+  return json ? JSON.parse(json) : null;
+}
+async function saveTokens(tokens: any) {
+  await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, JSON.stringify(tokens));
+}
+
+async function getAuthorizedClient(): Promise<OAuth2Client> {
+  const { installed } = await loadClientJSON();
+  const OAuth2Client = new google.auth.OAuth2(
+    installed.client_id,
+    installed.client_secret, 
+    'http://localhost:3000'
+  );
+  
+  // Try existing tokens
+  const cached = await loadTokens();
+  if (cached) {
+    OAuth2Client.setCredentials(cached);
+    return OAuth2Client;
+  }
+  // New auth: PKCE + loopback. Build URL and open the system browser
+  // google-auth-library provides helper for authCode with local server:
+  const authUrl = OAuth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPES,
+    prompt: 'consent',
+  });
+
+  // openExternal and run built-in codeReceiver
+  const { shell } = await import('electron');
+  await shell.openExternal(authUrl);
+
+  // Start local code receiver to wait for Google redirect
+  const { code } = await (OAuth2Client as any).getToken({
+    //?
+  });
+
+  const { tokens } = await OAuth2Client.getToken(code);
+  OAuth2Client.setCredentials(tokens);
+  await saveTokens(tokens);
+  return OAuth2Client;
+}
+
+// IPC: connect + fetch upcoming events -> JSON
+ipcMain.handle('google: fetchEvents', async (_evt, { calendarId, timeMin, timeMax, maxResults = 2500 }) => {
+  const auth = await getAuthorizedClient();
+  const calendar = google.calendar({ version: 'v3', auth });
+  const res = await calendar.events.list({
+    calendarId: calendarId || 'primary',
+    timeMin, timeMax, maxResults, singleEvents: true, orderBy: 'startTime',
+  });
+  return res.data; // already JSON serializable
+});
+
+// --- Electron Window  ---------------------------------------------
 
 let py: import('child_process').ChildProcessWithoutNullStreams | null = null;
 let win: BrowserWindow | null = null;
@@ -13,27 +92,7 @@ const __dirname = path.dirname(__filename);
 //TODO theme stuff 
 // // const isDark = nativeTheme.shouldUseDarkColors;
 
-// ipcMain.handle("ping", () => ({
-//   msg: "pong from main",
-//   electron: process.versions.electron,
-//   pid: process.pid,
-// }));
 
-// register this before or inside app.whenReady(), but before the renderer invokes it
-// ipcMain.handle('py:send', (_evt, payload) => {
-//   // You can stub this until Python is wired up
-//   console.log('[py:send] got payload from renderer:', payload);
-//   // return something to the renderer:
-//   return true; // or { ok: true }
-// });
-
-// ipcMain.handle('py:send', async (_evt, payload) => {
-//   // pretend we sent it to Python
-//   // you could even echo a fake event back to the renderer:
-//   win?.webContents.send('py:event', { type: 'echo', payload });
-//   console.log('[py:send] got payload from renderer:', payload);
-//   return { ok: true };
-// });
 
 // Ensure only one instance of the app runs
 const gotLock = app.requestSingleInstanceLock();
@@ -166,3 +225,8 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+//--- Calendar Window ---------------
+function createCalWin() {
+  calWindow = new BrowserWindow
+}

@@ -115,6 +115,9 @@ declare global {
       // passthrough
       ping: () => Promise<string>;
     };
+    gcal: {
+      fetchEvents: (opts: { calendarId?: string; timeMin?: string; timeMax?: string; maxResults?: number; }) => Promise<any>;
+    };
   }
 }
 export {};

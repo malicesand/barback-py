@@ -27,3 +27,8 @@ contextBridge.exposeInMainWorld('pybridge', {
   },
   ping: () => ipcRenderer.invoke('ping'),
 });
+
+contextBridge.exposeInMainWorld('gcal', {
+  fetchEvents: (opts: { calendarId?: string; timeMin?: string; timeMax?: string; maxResults?: number; }) => 
+    ipcRenderer.invoke('google:fetchEvents', opts),
+});

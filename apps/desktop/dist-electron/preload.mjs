@@ -26,3 +26,6 @@ electron.contextBridge.exposeInMainWorld("pybridge", {
   },
   ping: () => electron.ipcRenderer.invoke("ping")
 });
+electron.contextBridge.exposeInMainWorld("gcal", {
+  fetchEvents: (opts) => electron.ipcRenderer.invoke("google:fetchEvents", opts)
+});

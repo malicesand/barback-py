@@ -26,6 +26,7 @@ __pycache__/
 data/*.tsv
 data/*.json
 
+
 # Output
 *.out
 
@@ -38,3 +39,4 @@ logs/
 apps/desktop/node_modules/
 apps/desktop/dist/
 apps/desktop/out/
+apps/desktop/credentials/oauth_client.json
