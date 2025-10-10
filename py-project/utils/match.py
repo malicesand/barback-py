@@ -3,13 +3,15 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+# Buffer
+margin = timedelta(minutes=15)
+pacific = timezone(timedelta(hours=-7))
 central = timezone(timedelta(hours=-5))
-margin = timedelta(minutes=10)
 
 def match_photo_to_event(schedule: dict, photo_start: str, photo_end: str) -> Optional[str]:
   try: 
-    photo_start_dt = datetime.strptime(photo_start.strip(), "%Y:%m:%d %H:%M:%S").replace(tzinfo=central)
-    photo_end_dt = datetime.strptime(photo_end.strip(), "%Y:%m:%d %H:%M:%S").replace(tzinfo=central)
+    photo_start_dt = datetime.strptime(photo_start.strip(), "%Y:%m:%d %H:%M:%S").replace(tzinfo=pacific)
+    photo_end_dt = datetime.strptime(photo_end.strip(), "%Y:%m:%d %H:%M:%S").replace(tzinfo=pacific)
   except Exception as e: 
     print(f"Photo time parsing error: {e}")
     return None

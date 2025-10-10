@@ -1,3 +1,14 @@
+[project]
+name = "barback"
+version = "0.1.0"
+description = "Photo ingest and renaming utility with desktop front end"
+readme = "README.MD"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+barback = "barback.cli:main" 
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"  

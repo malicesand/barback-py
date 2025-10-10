@@ -5,26 +5,67 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
-.env
 .venv/
-*.log
 
-# VS Code
-.vscode/
+# VS Code / IDEs
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
 
 # pytest, coverage, etc.
 .pytest_cache/
 .coverage
 .mypy_cache/
+.dmypy.json
+.pyre/
 
-# Data files
-data/*.tsv
-data/*.json
+# Ruff
+.ruff_cache/
+
+# User data
+**/data/*.tsv
+**/data/*.json
+
 
 # Output
 *.out
 
-# logs / runtime artifacts
+# Logs / Runtime Artifacts
 run_log.csv
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node & dependencies
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.local
+
+# Electron 
+**/dist-electron/
+**/out/
+**/build/
+**/release/
+
+# Credentials
+**/oauth_client.json
+*.env
+*.env.*
+
+# Vite Cache
+**/.vite/
+**/node_modules/.vite/
+
+# ESLint Cache
+.eslintcache

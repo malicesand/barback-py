@@ -10,11 +10,11 @@ def load_schedule(prefix: str, folder: str = 'data') -> dict:
   Loads a schedule JSON file for the given prefix from the specified folder.
 
   Args: 
-    prefix (str): the prefix that identifies the file.
+    prefix (str): the photographers initials -- NOT their prefix
     folder (str): The folder where the JSON file is stored.
 
   Returns:
-    dict: A dictionary with MEIDs as keys and [start, end] strings as values
+    dict: The photographers schedule.json with MEIDs as keys and [start, end] strings as values
   """
 
   filename = f'{folder}/schedule_{prefix}.json'
