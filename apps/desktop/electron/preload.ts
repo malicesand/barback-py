@@ -8,8 +8,6 @@ ipcRenderer.on('py:event', (_e: IpcRendererEvent, data: unknown) => {
   for (const fn of PyListeners) fn(data);
 })
 
-console.log('[preload] running:', 'index.html');
-
 contextBridge.exposeInMainWorld('pybridge', {
   sendToPython(payload: unknown) {
     return ipcRenderer.invoke('py:send', payload);
@@ -29,6 +27,10 @@ contextBridge.exposeInMainWorld('pybridge', {
 });
 
 contextBridge.exposeInMainWorld('gcal', {
-  fetchEvents: (opts: { calendarId?: string; timeMin?: string; timeMax?: string; maxResults?: number; }) => 
-    ipcRenderer.invoke('google:fetchEvents', opts),
+  googleConnectAndOpenUpload: () => ipcRenderer.invoke('google:connectAndOpenUpload'),
+  listCalendars: () => ipcRenderer.invoke('google:listCalendars'),
+  fetchEvents: (opts: any) => ipcRenderer.invoke('google:fetchEvents', opts),
+  exportCalendarJson: (opts: any) => ipcRenderer.invoke('google:exportCalendarJson', opts),
+  exportMultipleCalendarsJson: (opts: any) => ipcRenderer.invoke('google:exportMultipleCalendarsJson', opts),
 });
+console.log('[PRELOAD] gcal bridge installed');

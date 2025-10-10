@@ -4,7 +4,6 @@ const PyListeners = /* @__PURE__ */ new Set();
 electron.ipcRenderer.on("py:event", (_e, data) => {
   for (const fn of PyListeners) fn(data);
 });
-console.log("[preload] running:", "index.html");
 electron.contextBridge.exposeInMainWorld("pybridge", {
   sendToPython(payload) {
     return electron.ipcRenderer.invoke("py:send", payload);
@@ -27,5 +26,10 @@ electron.contextBridge.exposeInMainWorld("pybridge", {
   ping: () => electron.ipcRenderer.invoke("ping")
 });
 electron.contextBridge.exposeInMainWorld("gcal", {
-  fetchEvents: (opts) => electron.ipcRenderer.invoke("google:fetchEvents", opts)
+  googleConnectAndOpenUpload: () => electron.ipcRenderer.invoke("google:connectAndOpenUpload"),
+  listCalendars: () => electron.ipcRenderer.invoke("google:listCalendars"),
+  fetchEvents: (opts) => electron.ipcRenderer.invoke("google:fetchEvents", opts),
+  exportCalendarJson: (opts) => electron.ipcRenderer.invoke("google:exportCalendarJson", opts),
+  exportMultipleCalendarsJson: (opts) => electron.ipcRenderer.invoke("google:exportMultipleCalendarsJson", opts)
 });
+console.log("[PRELOAD] gcal bridge installed");

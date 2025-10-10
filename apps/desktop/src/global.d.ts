@@ -1,4 +1,5 @@
 // Global Types
+import type { calendar_v3 } from 'googleapis';
 
 export type Card = {
   volume_name: string;
@@ -103,6 +104,17 @@ export type PyCmd =
   | UnignoreCmd
   | LegacyListDcimCmd;
 
+// src/types/gcal.ts
+export type FetchEventsOpts = {
+  calendarId?: string;
+  /** RFC3339 string, e.g. '2025-07-19T00:00:00-05:00' */
+  timeMin?: string;
+  /** RFC3339 string, e.g. '2025-07-28T23:59:59-05:00' */
+  timeMax?: string;
+  maxResults?: number;
+};
+
+
 declare global {
   interface Window {
     pybridge: {
@@ -115,9 +127,26 @@ declare global {
       // passthrough
       ping: () => Promise<string>;
     };
+
     gcal: {
-      fetchEvents: (opts: { calendarId?: string; timeMin?: string; timeMax?: string; maxResults?: number; }) => Promise<any>;
+      googleConnectAndOpenUpload: () => Promise<{ ok: true }>;
+      listCalendars: () => Promise<Array<{ id: string; summary: string; primary: boolean }>>;
+      fetchEvents: (opts: {
+        calendarId?: string; timeMin?: string; timeMax?: string; maxResults?: number;
+      }) => Promise<calendar_v3.Schema$Events>;
+      exportCalendarJson: (opts: {
+        calendarId: string; timeMin: string; timeMax: string; suggestedFilename?: string;
+      }) => Promise<{ ok: true; filePath: string; calName: string } | { ok: false; error: string }>;
+      exportMultipleCalendarsJson: (opts: {
+        calendarIds: string[]; timeMin: string; timeMax: string;
+      }) => Promise<Array<{ id: string; ok: boolean; filePath?: string; error?: string }>>;
     };
+
+    dbg: {
+      listIpc: () => Promise<string[]>;
+      /** (optional) quick health check */
+      ping?: () => Promise<{ ok: true; pid: number; ts?: number }>;
+    }
   }
 }
 export {};
