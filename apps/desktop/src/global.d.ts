@@ -114,6 +114,12 @@ export type FetchEventsOpts = {
   maxResults?: number;
 };
 
+export type Calendar = {
+  id: string;
+  summary: string;
+  primary?: boolean;
+}
+
 
 declare global {
   interface Window {

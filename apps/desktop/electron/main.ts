@@ -163,10 +163,11 @@ function isDev() {
   return !!process.env.VITE_DEV_SERVER_URL;
 }
 function getDataDir(): string {
-  const devDir = path.join(process.cwd(), 'data');
+  const devDir = path.join(__dirname, '../../../py-project/data/');
   const prodDir = path.join(app.getPath('userData'), 'data');
   const dir = isDev() ? devDir : prodDir;
   if (!fssync.existsSync(dir)) fssync.mkdirSync(dir, { recursive: true });
+  console.log('[MAIN] Uploaded')
   return dir;
 }
 
@@ -206,7 +207,7 @@ async function exportOneCalendarToDataDir(opts: {
   const calMap = toCalMap(evRes.data);
   const json = JSON.stringify(calMap, null, 2);
 
-  const baseName = opts.suggestName ?? `schedule_${calName}.json`;
+  const baseName = opts.suggestName ?? `schedule_${calName.slice(0, 3)}.json`;
   const filePath = await writeCalendarJsonFile(baseName, json);
 
   return { ok: true as const, filePath, calName };
