@@ -1,8 +1,6 @@
 // upload calendar
 import { useEffect, useState } from 'react';
-import { type Calendar } from '../global.d.ts'
-import fs from 'node:fs/promises';
-import * as path from 'node:path';
+import { type Calendar } from '../global.d.ts';
 
 
 export default function CallConnect() {
@@ -17,11 +15,11 @@ export default function CallConnect() {
   //   console.log(selected)
   // }
 
-  async function getSchedules() {
-    const data = fs.readdir(path.join(__dirname, '../../../../py-project/data/'));
-    console.log(data);
+  // async function getSchedules() {
+  //   const data = fs.readdir(path.join(__dirname, '../../../../py-project/data/'));
+  //   console.log(data);
 
-  }
+  // }
 
   async function saveSelected(selected: string[]) {
     const timeMin = '2025-10-11T00:00:00-05:00';
@@ -50,7 +48,7 @@ export default function CallConnect() {
             </div>
           )})}
           <button onClick={() => saveSelected(selected)}> Upload </button>
-          <button onClick={() => getSchedules()}>Schedules</button>
+          {/* <button onClick={() => getSchedules()}>Schedules</button> */}
         </div>
       </div>
     );

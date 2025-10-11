@@ -7,10 +7,47 @@ import { google, calendar_v3 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import fs from 'node:fs/promises';
 import fssync from 'fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import http from 'http';
 import { URL } from 'url';
+import readline from 'node:readline';
 
 
+
+
+
+
+
+const RUNTIME_BASE = app.isPackaged
+  ? process.resourcesPath               // Barback.app/Contents/Resources
+  : process.cwd();                      // apps/desktop while dev
+if (app.isPackaged) app.setName('Barback-Desk2');
+
+const RESOURCES_DIR = path.join(RUNTIME_BASE, 'resources'); // packaged via extraResources
+const PYPROJ = path.join(RUNTIME_BASE, 'py-project');
+const CREDS_PATH = path.join(RESOURCES_DIR, 'credentials', 'oauth_client.json');
+
+const USERDATA_DIR = app.getPath('userData');               // writable
+const TOKEN_PATH = path.join(USERDATA_DIR, 'google', 'token.json');
+
+async function ensureTokenDir() {
+  await fs.mkdir(path.dirname(TOKEN_PATH), { recursive: true }).catch(() => {});
+}
+
+async function ensureDefaultSchedules() {
+  const src = path.join(RESOURCES_DIR, 'schedules'); // put defaults here
+  const dst = path.join(USERDATA_DIR, 'schedules');
+  await fs.mkdir(dst, { recursive: true }).catch(() => {});
+  try {
+    const files = await fs.readdir(src);
+    for (const f of files) {
+      const from = path.join(src, f);
+      const to = path.join(dst, f);
+      try { await fs.access(to); } catch { await fs.copyFile(from, to); }
+    }
+  } catch { /* no bundled defaults – OK */ }
+}
+app.whenReady().then(ensureDefaultSchedules);
 
 // --- Google API -------------------------------------------------------
 // const SERVICE_NAME = 'Calendar-Connect';
@@ -19,16 +56,30 @@ const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
 const TOKENS_FILE = path.join(app.getPath('userData'), 'google-oauth.enc')
 
 // Load Desktop OAuth client (client_id, 'secret' ignored)
+//* Old
+// async function loadClientJSON() {
+//   const credPath = path.join(process.resourcesPath, 'oauth_client.json');
+//   try {
+//     return JSON.parse(await fs.readFile(credPath, 'utf8'));
+//   } catch {
+//     // dev fallback
+//     const devPath = path.join(process.cwd(), 'credentials/oauth_client.json');
+//     return JSON.parse(await fs.readFile(devPath, 'utf8'));
+//   }
+// }
+//*New 
+// Load Desktop OAuth client (client_id, client_secret, redirect_uris)
 async function loadClientJSON() {
-  const credPath = path.join(process.resourcesPath, 'oauth_client.json');
+  const prodCreds = path.join(process.resourcesPath, 'resources', 'credentials', 'oauth_client.json');
+  const devCreds  = path.join(process.cwd(), 'credentials', 'oauth_client.json'); // your dev copy
+
   try {
-    return JSON.parse(await fs.readFile(credPath, 'utf8'));
+    return JSON.parse(await fs.readFile(prodCreds, 'utf8'));
   } catch {
-    // dev fallback
-    const devPath = path.join(process.cwd(), 'credentials/oauth_client.json');
-    return JSON.parse(await fs.readFile(devPath, 'utf8'));
+    return JSON.parse(await fs.readFile(devCreds, 'utf8'));
   }
 }
+
 
 async function saveTokens(tokens: any) {
   const plaintext = JSON.stringify(tokens);
@@ -42,6 +93,7 @@ async function saveTokens(tokens: any) {
 }
 // Restore tokens (if any)
 async function loadTokens(): Promise<any | null> {
+    console.log('[AUTH] loadTokens from', TOKENS_FILE);
   if (!fssync.existsSync(TOKENS_FILE)) return null;
 
   const buf = await fs.readFile(TOKENS_FILE);
@@ -57,7 +109,7 @@ async function loadTokens(): Promise<any | null> {
   } else {
     jsonStr = buf.toString('utf8');
   }
-
+   console.log('[AUTH] token loaded OK');
   try { return JSON.parse(jsonStr); } catch { return null; }
 }
 
@@ -213,29 +265,65 @@ async function exportOneCalendarToDataDir(opts: {
   return { ok: true as const, filePath, calName };
 }
 
+// type AuthOpts = {
+//   credentialsPath: string;
+//   tokenPath: string;
+//   openExternal?: (url: string) => void;
+// };
+
 async function getAuthorizedClient(): Promise<import('google-auth-library').OAuth2Client> {
-  const { installed } = await loadClientJSON();
- 
+  //* Old
+  // const { installed } = await loadClientJSON();
   // Try existing tokens with redirect URI
+  // const cached = await loadTokens();
+  // if (cached) {
+  //   const client = createOAuthClient('http://127.0.0.1', installed);
+  //   client.setCredentials(cached);
+  //   return client;
+  // }
+  // // Otherwise run the loopback login
+  //* New
+  // Try existing tokens with redirect URI
+  console.log('[AUTH] entering getAuthorizedClient');
+  const { installed } = await loadClientJSON();
   const cached = await loadTokens();
+  console.log('[AUTH] cached?', !!cached);
   if (cached) {
-    const client = createOAuthClient('http://127.0.0.1', installed);
+    // Use the first redirect URI from the client JSON
+    const fallback = 'http://127.0.0.1';
+    const redirect = (installed?.redirect_uris?.[0]) ?? fallback;
+    
+    const client = createOAuthClient(redirect, installed);
     client.setCredentials(cached);
     return client;
   }
-  // Otherwise run the loopback login
   const client = await runLoopBackAuth(installed);
   return client;
+
 }
 
 function registerGoogleIpc() {
   console.log('[MAIN] registering Google IPC...');
   // Connect and open Upload Window
   ipcMain.handle('google:connectAndOpenUpload', async () => {
-    await getAuthorizedClient(); // triggers login if needed
-    openUploadWindow();
-    // You can also return profile/calendar list here if you want
-    return { ok: true };
+    try {
+    // make sure packaged creds exist
+    await fs.access(CREDS_PATH);
+  } catch {
+    throw new Error(`Missing Google credentials at ${CREDS_PATH}`);
+  }
+
+  await ensureTokenDir();
+
+  // Pass explicit paths to your auth layer
+  await getAuthorizedClient();
+  
+  openUploadWindow();
+  return { ok: true };
+    // await getAuthorizedClient(); // triggers login if needed
+    // openUploadWindow();
+    // // You can also return profile/calendar list here if you want
+    // return { ok: true };
   });
 
   // List Calendars the user has access to (id + summary)
@@ -354,36 +442,77 @@ let uploadWin: BrowserWindow | null = null;
 // // const isDark = nativeTheme.shouldUseDarkColors;
 
 
+// function openUploadWindow() {
+//   if (uploadWin && !uploadWin.isDestroyed()) {
+//     uploadWin.show();
+//     uploadWin.focus();
+//     return;
+//   }
+//   uploadWin = new BrowserWindow({
+//     width: 960,
+//     height: 720,
+//     title: 'Google Calendar Upload',
+//     webPreferences: {
+//   preload: path.join(__dirname, 'preload.mjs'),
+//   contextIsolation: true,
+//   nodeIntegration: false,
+// }
+
+//   });
+//   // Route by hash (local host) in dev
+//   // In production load apps file/Url and route to upload
+//   if (process.env.VITE_DEV_SERVER_URL) {
+//     uploadWin.loadURL(`${process.env.VITE_DEV_SERVER_URL}#/upload`);
+//   } else {
+//     // adjust if you use file:// scheme from Vite build output
+//     uploadWin.loadURL(`app://index.html#/upload`);
+//   }
+
+//   uploadWin.on('closed', () => (uploadWin = null));
+// }
+
 function openUploadWindow() {
   if (uploadWin && !uploadWin.isDestroyed()) {
     uploadWin.show();
     uploadWin.focus();
     return;
   }
+
   uploadWin = new BrowserWindow({
     width: 960,
     height: 720,
     title: 'Google Calendar Upload',
+    show: false,
+    autoHideMenuBar: true,
     webPreferences: {
-     preload: path.join(__dirname, 'preload.mjs'),
-     contextIsolation: true,
-     nodeIntegration: false,
-    
-    }
+      preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
   });
 
-  // Route by hash (local host) in dev
-  // In production load apps file/Url and route to upload
-  if (process.env.VITE_DEV_SERVER_URL) {
-    uploadWin.loadURL(`${process.env.VITE_DEV_SERVER_URL}#/upload`);
+  const devUrl = process.env.VITE_DEV_SERVER_URL;
+
+  if (devUrl) {
+    // Dev: Vite server — include the hash route
+    uploadWin.loadURL(`${devUrl}#/upload`);
+    uploadWin.webContents.openDevTools({ mode: 'detach' });
   } else {
-    // adjust if you use file:// scheme from Vite build output
-    uploadWin.loadURL(`app://index.html#/upload`);
+    // Prod: built file — use loadFile with hash option
+    const indexHtml = path.join(__dirname, '../dist/index.html');
+    uploadWin.loadFile(indexHtml, { hash: 'upload' });
   }
 
-  uploadWin.on('closed', () => (uploadWin = null));
-}
+  uploadWin.once('ready-to-show', () => uploadWin?.show());
 
+  uploadWin.on('closed', () => {
+    uploadWin = null as unknown as BrowserWindow; // or set to null if typed that way
+  });
+
+  uploadWin.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.error('uploadWin did-fail-load:', { code, desc, url });
+  });
+}
 
 // Ensure only one instance of the app runs
 // const gotLock = app.requestSingleInstanceLock();
@@ -415,26 +544,47 @@ function createWindow() {
     // visualEffectState: 'active',
     // backgroundMaterial: 'mica',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+  preload: path.join(__dirname, 'preload.mjs'),
+  contextIsolation: true,
+  nodeIntegration: false,
+}
+});
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    win.loadURL(process.env.VITE_DEV_SERVER_URL);
+const devUrl = process.env.VITE_DEV_SERVER_URL;
+  const isDev = !!devUrl;
+
+  if (isDev) {
+    // dev: plugin serves the renderer here
+    win.loadURL(devUrl);
+    win.webContents.openDevTools({ mode: 'detach' });
   } else {
-    win.loadFile(path.join(__dirname, '../index.html'));
+    // prod: load the built index.html (dist/index.html)
+    // __dirname is <...>/dist-electron at runtime
+    const indexHtml = path.join(__dirname, '../dist/index.html');
+    win.loadFile(indexHtml);
   }
 
-  win.on('closed', () => (win = null));
+  win.once('ready-to-show', () => win?.show());
+
+  // helpful diagnostics if something fails to load
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.error('did-fail-load:', { code, desc, url });
+  });
+  // if (process.env.VITE_DEV_SERVER_URL) {
+  //   win.loadURL(process.env.VITE_DEV_SERVER_URL);
+  // } else {
+  //   win.loadFile(path.join(__dirname, '../index.html'));
+  // }
+
+  // win.on('closed', () => (win = null));
 }
 
 // -- Python Launch Code -------
 function spawnPython() {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-  const scriptPath = path.join(__dirname, '../../../py-project/watch_card.py')
-
+  
+  const scriptPath = app.isPackaged ? path.join(PYPROJ, 'watch_card.py') :path.join(__dirname, '../../../py-project/watch_card.py')
+  console.log('[PY] scriptPath', scriptPath, 'exists?', fssync.existsSync(scriptPath));
   // Python to access on open
   py = spawn(pythonCmd, [scriptPath], {
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -491,10 +641,15 @@ function spawnPython() {
 app.whenReady().then(() => {
   registerGoogleIpc();
   spawnPython();
+  // startPython();
   createWindow();
   // macOS: only recreate when none exist
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  console.log('[APP]', 'name=', app.getName());
+console.log('[APP]', 'userData=', app.getPath('userData'));
+console.log('[APP]', 'resourcesPath=', process.resourcesPath);
+console.log('[AUTH]', 'TOKENS_FILE=', path.join(app.getPath('userData'), 'google-oauth.enc'));
+  app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   });
 
   // // renderer -> python (send command objects)
@@ -509,9 +664,9 @@ app.whenReady().then(() => {
   // });
 
   app.on('before-quit', () => {
-    try { py?.kill(); } catch {}
+   stopPython();
   });
-});
+
 
 // App close behavior
 app.on('window-all-closed', () => {
