@@ -1,9 +1,10 @@
-# Works with Electron to display cards
+# Entry file for Electron Spawn #
+# Watch 
 
 import os
 import sys
 import json
-import time
+import time # TODO
 import subprocess
 import threading
 from pathlib import Path
@@ -11,45 +12,27 @@ from threading import Thread
 from threading import Event
 
 
-
-# ---- Config / Globals --------------------------------
-IGNORE_LIST = { #! update with Josh
+# ---------------  Config/ Globals  --------------- #
+IGNORE_LIST = {
    'macintosh hd', 
-   'totc24 Backup', 
-   'totc 2025 raid', 
-   'totc25 temp', 
-   "avclub's mac studio (7)", 
-   'totc edit'
+   'pdxcw25_A', 
+   'pdxcw25_B', 
 } 
 SESSION_IGNORES = set()
-# SCRIPT_PATH = 'rename_files.py'
+# SCRIPT_PATH = 'rename_files.py' TODO 
 DCIM_FOLDER_NAME = 'DCIM'
-POLL_INTERVAL = 5 # in seconds
-SESSION_LOCK = threading.Lock() # protect SESSION_IGNORES
+POLL_INTERVAL = 5 # in seconds TODO
+SESSION_LOCK = threading.Lock() # protect session ignores
 
-# ---- resolve absolute path to renamer script -----------------------
-# def _find_repo_root():
-#    here = Path(__file__).resolve()
-#    for p in [here] + list(here.parents):
-#       if (p / 'pyproject.toml').exists() or (p / '.git').exists():
-#          return p
-#    return here.parent
+# ---------------  ELECTRON RENDERER HANDLERS  --------------- #
 
-# REPO_ROOT = _find_repo_root()
-
-# Candidates that match repo layout
-# _SCRIPT_CANDIDATES = [
-#    REPO_ROOT / 'barback' / 'core' / 
-# ]
-# ---- Utilities -----------------------------------------------------
-
+# ___ IPC Handlers ___#
 def send_event(type_, **payload):
-    #Send an event as a single JSON line to stdout (flush immediately)
+    # Send an event as a single JSON line to stdout (flush immediately)
     msg = {"type": type_, **payload}
     print(json.dumps(msg), flush=True)
 
-def _natural_key(s: str):
-    # natural sort like 100MSDCF, 101MSDCF, …
+def _natural_key(s: str): # natural sort by folder name commonly used by cameras (100MSDCF, 101MSDCF…)
     import re
     return [int(t) if t.isdigit() else t.lower() for t in re.findall(r'\d+|\D+', s)]
 
@@ -76,7 +59,7 @@ def relevant_cards_snapshot():
               'folder_count': folder_count
            })
    return cards
-
+# Show DCIM Children
 def list_dcim_folders(dcim_path: str, include_counts=True, max_entries=500):
     # safety: only allow paths under /Volumes/*/DCIM
     safe_root = os.path.realpath('/Volumes')
@@ -116,16 +99,16 @@ def list_dcim_folders(dcim_path: str, include_counts=True, max_entries=500):
     except FileNotFoundError:
         rows = []
 
-    # natural sort by folder name commonly used by cameras (100MSDCF, 101MSDCF…)
-    
     rows.sort(key=lambda r: _natural_key(r['name']))
     return rows[:max_entries]
 
+# Tell vite to retain py-project tree
 HERE = Path(__file__).resolve().parent
 SCRIPT_PATH = HERE / 'rename_files.py'
+
 def run_script(volume_path):
     try:
-        send_event("rename_started", volume_path=volume_path)
+        send_event("rename_started", message=f'renaming {volume_path}', volume_path=volume_path)
 
         if not SCRIPT_PATH.exists():
            send_event('rename_finished', volume_path=volume_path, ok=False, error=f'rename not found at {SCRIPT_PATH}')
@@ -136,7 +119,6 @@ def run_script(volume_path):
 
         try: 
            subprocess.run(
-            #   [sys.executable, "-u", "-m", "rename_files", volume_path],
               [sys.executable, "-u", str(SCRIPT_PATH), volume_path],
               cwd=str(HERE), # anchor working directory
               env=env,
@@ -146,7 +128,7 @@ def run_script(volume_path):
               stderr=sys.stderr,
               text=True,
            )
-           sys.stderr.write(f"[WATCHER] run_script → {SCRIPT_PATH} cwd={HERE} target={volume_path}\n"); sys.stderr.flush()
+           sys.stderr.write(f"[WATCHER] renaming target={volume_path}\n"); sys.stderr.flush()
            Path(os.path.join(volume_path, '.renamed')).touch()
            send_event("rename_finished", volume_path=volume_path, ok=True)
         except subprocess.CalledProcessError as e:
@@ -157,7 +139,7 @@ def run_script(volume_path):
        # force-refresh dcim list
        send_event("dcim_snapshot", cards=relevant_cards_snapshot())
 
-# ---- ACTION Handlers -----------------------------------------------------------
+# ___ ACTION Handlers ___#
 
 def act_cards_snapshot(data):
    return {'ok': True, 'cards': relevant_cards_snapshot()}
@@ -175,9 +157,10 @@ def act_mark_ignored(data):
       return {'ok': False, 'error': 'Missing volume_name'}
    with SESSION_LOCK:
       SESSION_IGNORES.add(name)
+
    return {'ok': True, 'volume_name': name}
 
-def act_unignore(data):
+def act_unignore(data): 
    name = (data.get('volume_name') or '').lower()
    if not name:
       return {'ok': False, 'error': 'Missing volume_name'}
@@ -185,8 +168,8 @@ def act_unignore(data):
       if name in SESSION_IGNORES:
          SESSION_IGNORES.remove(name)
    return {'ok': True, 'volume_name': name}
-
-def act_cards_list_dcim(data):
+# Get DCIM Info
+def act_cards_list_dcim(data): 
    dcim_path = data.get('dcim_path')
    include_counts = bool(data.get('include_counts', True))
    folders = list_dcim_folders(dcim_path, include_counts=include_counts)
@@ -205,8 +188,6 @@ ALIASES = {
    'run_rename': 'run-rename',
    'mark_ignored': 'mark-ignored',
 }
-
-# ---- Command Loop -----------------------------------------------------
 
 def stdin_command_loop(stop_event: Event):
 # Read newline-delimited JSON commands from stdin. 
@@ -242,7 +223,9 @@ def stdin_command_loop(stop_event: Event):
     except Exception as e:
        send_event('error', message='Command parsing/dispatch failed', detail=str(e))
 
-# ---- Watcher (polling) ----------------------------------------------------------------------------
+
+
+# ---------------  WATCH CARD  --------------- #
 def watch_cards(stop_event: Event):
   send_event('ready', message='Watching for memory cards with DCIM folders')
   last_names = set()
@@ -257,10 +240,8 @@ def watch_cards(stop_event: Event):
        send_event('error', message='Watcher error', detail=str(e))
     stop_event.wait(POLL_INTERVAL)
      
-# ---- Main -------------------------------------------------------------------------------------
 def main():
    stop_event = Event()
-  
    t = Thread(target=stdin_command_loop, args=(stop_event,), daemon=True)
    t.start()
 
@@ -272,3 +253,12 @@ def main():
 
 if __name__ == '__main__':
   main()
+
+  '''
+  Backlog
+   #TODO FRONT END to display renamed and ignored cards
+   #TODO FRONT END button to unignore
+   #TODO Function show front end shows a special name
+   #? Find DCIM path return
+   #? What is this data though
+  '''

@@ -78,11 +78,11 @@ def get_first_and_last_data(dir_path: str, prefix_map: dict) -> Optional[Tuple[s
   # Assign photographer based on prefix
   prefix = extract_known_prefix(image_files[0], prefix_map)
   if not prefix:
-    print(f"⚠️  No matching prefix found for {image_files[0]}")
+    # print(f"⚠️  No matching prefix found for {image_files[0]}")
     return None
   photographer = prefix_map.get(prefix)
   if not photographer:
-    print(f"⚠️  No matching photographer found for prefix {prefix}")
+    # print(f"⚠️  No matching photographer found for prefix {prefix}")
     return None
 
 

@@ -14,14 +14,29 @@ import readline from 'node:readline';
 
 
 
+// ------------------------- Preload Debug ------------------------- //
+// Preload exceptions 
+app.on('web-contents-created', (_e, contents) => {
+    contents.on('preload-error', (_event, preloadPath, error) => {
+    console.error('[preload-error]', preloadPath, error);
+  });
+    contents.on('render-process-gone', (_e2, details) => {
+    console.error('[render-process-gone]', details);
+  });
+    contents.on('did-fail-load', (_e3, code, desc, url) => {
+    console.error('[did-fail-load]', { code, desc, url });
+  });
+});
 
+// catch errors forwarded from preload
+ipcMain.on('preload:error', (_e, msg) => console.error('[preload:error]', msg));
 
 
 
 const RUNTIME_BASE = app.isPackaged
   ? process.resourcesPath               // Barback.app/Contents/Resources
   : process.cwd();                      // apps/desktop while dev
-if (app.isPackaged) app.setName('Barback-Desk2');
+if (app.isPackaged) app.setName('Barback-Desk3');
 
 const RESOURCES_DIR = path.join(RUNTIME_BASE, 'resources'); // packaged via extraResources
 const PYPROJ = path.join(RUNTIME_BASE, 'py-project');
@@ -49,25 +64,10 @@ async function ensureDefaultSchedules() {
 }
 app.whenReady().then(ensureDefaultSchedules);
 
-// --- Google API -------------------------------------------------------
-// const SERVICE_NAME = 'Calendar-Connect';
-// const ACCOUNT_NAME = 'google-oauth-token';
+// --------------------------- Google API --------------------------- //
 const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
 const TOKENS_FILE = path.join(app.getPath('userData'), 'google-oauth.enc')
 
-// Load Desktop OAuth client (client_id, 'secret' ignored)
-//* Old
-// async function loadClientJSON() {
-//   const credPath = path.join(process.resourcesPath, 'oauth_client.json');
-//   try {
-//     return JSON.parse(await fs.readFile(credPath, 'utf8'));
-//   } catch {
-//     // dev fallback
-//     const devPath = path.join(process.cwd(), 'credentials/oauth_client.json');
-//     return JSON.parse(await fs.readFile(devPath, 'utf8'));
-//   }
-// }
-//*New 
 // Load Desktop OAuth client (client_id, client_secret, redirect_uris)
 async function loadClientJSON() {
   const prodCreds = path.join(process.resourcesPath, 'resources', 'credentials', 'oauth_client.json');
@@ -303,7 +303,7 @@ async function getAuthorizedClient(): Promise<import('google-auth-library').OAut
 }
 
 function registerGoogleIpc() {
-  console.log('[MAIN] registering Google IPC...');
+  // console.log('[MAIN] registering Google IPC...');
   // Connect and open Upload Window
   ipcMain.handle('google:connectAndOpenUpload', async () => {
     try {
@@ -428,7 +428,7 @@ function registerGoogleIpc() {
     }
     return results;
   });
-  console.log('[MAIN] registered ipcs')
+  // console.log('[MAIN] registered ipcs')
 }
 
 // --- Electron Window  ---------------------------------------------
@@ -441,7 +441,7 @@ let uploadWin: BrowserWindow | null = null;
 //TODO theme stuff 
 // // const isDark = nativeTheme.shouldUseDarkColors;
 
-
+//TODO Dead code
 // function openUploadWindow() {
 //   if (uploadWin && !uploadWin.isDestroyed()) {
 //     uploadWin.show();
@@ -544,19 +544,19 @@ function createWindow() {
     // visualEffectState: 'active',
     // backgroundMaterial: 'mica',
     webPreferences: {
-  preload: path.join(__dirname, 'preload.mjs'),
-  contextIsolation: true,
-  nodeIntegration: false,
-}
-});
+      preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    }
+  });
 
-const devUrl = process.env.VITE_DEV_SERVER_URL;
+  const devUrl = process.env.VITE_DEV_SERVER_URL;
   const isDev = !!devUrl;
 
   if (isDev) {
     // dev: plugin serves the renderer here
     win.loadURL(devUrl);
-    win.webContents.openDevTools({ mode: 'detach' });
+    // win.webContents.openDevTools({ mode: 'detach' });
   } else {
     // prod: load the built index.html (dist/index.html)
     // __dirname is <...>/dist-electron at runtime
@@ -570,20 +570,21 @@ const devUrl = process.env.VITE_DEV_SERVER_URL;
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
     console.error('did-fail-load:', { code, desc, url });
   });
+  //! Dead?
   // if (process.env.VITE_DEV_SERVER_URL) {
   //   win.loadURL(process.env.VITE_DEV_SERVER_URL);
   // } else {
   //   win.loadFile(path.join(__dirname, '../index.html'));
   // }
 
-  // win.on('closed', () => (win = null));
+  // win.on('closed', () => (win = null)); //? needed ?
 }
 
 // -- Python Launch Code -------
 function spawnPython() {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   
-  const scriptPath = app.isPackaged ? path.join(PYPROJ, 'watch_card.py') :path.join(__dirname, '../../../py-project/watch_card.py')
+  const scriptPath = app.isPackaged ? path.join(PYPROJ, 'watch_card.py') : path.join(__dirname, '../../../py-project/watch_card.py')
   console.log('[PY] scriptPath', scriptPath, 'exists?', fssync.existsSync(scriptPath));
   // Python to access on open
   py = spawn(pythonCmd, [scriptPath], {
@@ -603,8 +604,8 @@ function spawnPython() {
     }
   })
 
-  // --- stderr -------------------------------------
-  // python prints to window
+  //  ------------------------- stderr ------------------------- //
+  // set python logs to print to devConsole
   py.stderr.setEncoding('utf8');
 
   let errBuf = '';
@@ -637,22 +638,24 @@ function spawnPython() {
   ipcMain.handle('ping', () => 'pong');
 };
 
+// ------------------------ Electron Window ------------------------ //
 // Open Window
 app.whenReady().then(() => {
   registerGoogleIpc();
   spawnPython();
-  // startPython();
+  // startPython(); //! dead?
   createWindow();
-  // macOS: only recreate when none exist
-  console.log('[APP]', 'name=', app.getName());
-console.log('[APP]', 'userData=', app.getPath('userData'));
-console.log('[APP]', 'resourcesPath=', process.resourcesPath);
-console.log('[AUTH]', 'TOKENS_FILE=', path.join(app.getPath('userData'), 'google-oauth.enc'));
+
+  // console.log('[APP]', 'name=', app.getName());
+  // console.log('[APP]', 'userData=', app.getPath('userData'));
+  // console.log('[APP]', 'resourcesPath=', process.resourcesPath);
+  // console.log('[AUTH]', 'TOKENS_FILE=', path.join(app.getPath('userData'), 'google-oauth.enc'));
+
   app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   });
 
-  // // renderer -> python (send command objects)
+  //! Dead? renderer -> python (send command objects)
   // ipcMain.handle('py:send', (_evt, payload: unknown) => {
   //   if (!py || !py.stdin.writable) return false;
   //   try {
@@ -663,10 +666,9 @@ app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) creat
   //   }
   // });
 
-  app.on('before-quit', () => {
-   stopPython();
-  });
-
+  // app.on('before-quit', () => {
+  //  stopPython();
+  // });
 
 // App close behavior
 app.on('window-all-closed', () => {

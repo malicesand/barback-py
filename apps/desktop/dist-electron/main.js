@@ -2,7 +2,7 @@ import "electron";
 import "node:path";
 import "child_process";
 import "node:url";
-import "./main-BocfHDf7.js";
+import "./main-BvdUmjbI.js";
 import "node:fs/promises";
 import "fs";
 import "http";

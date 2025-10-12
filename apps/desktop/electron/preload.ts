@@ -7,7 +7,7 @@ const PyListeners = new Set<PyListener>();
 ipcRenderer.on('py:event', (_e: IpcRendererEvent, data: unknown) => {
   for (const fn of PyListeners) fn(data);
 })
-
+// ------------------------- PyBridge ------------------------- //
 contextBridge.exposeInMainWorld('pybridge', {
   sendToPython(payload: unknown) {
     return ipcRenderer.invoke('py:send', payload);
@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('pybridge', {
   },
   ping: () => ipcRenderer.invoke('ping'),
 });
-
+// ------------------------- Google ------------------------- //
 contextBridge.exposeInMainWorld('gcal', {
   googleConnectAndOpenUpload: () => ipcRenderer.invoke('google:connectAndOpenUpload'),
   listCalendars: () => ipcRenderer.invoke('google:listCalendars'),
@@ -33,4 +33,3 @@ contextBridge.exposeInMainWorld('gcal', {
   exportCalendarJson: (opts: any) => ipcRenderer.invoke('google:exportCalendarJson', opts),
   exportMultipleCalendarsJson: (opts: any) => ipcRenderer.invoke('google:exportMultipleCalendarsJson', opts),
 });
-console.log('[PRELOAD] gcal bridge installed');
