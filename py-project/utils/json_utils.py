@@ -16,12 +16,14 @@ def load_schedule(prefix: str, folder: str = 'data') -> dict:
   Returns:
     dict: The photographers schedule.json with MEIDs as keys and [start, end] strings as values
   """
-
+  
   filename = f'{folder}/schedule_{prefix}.json'
   path = Path(filename)
 
+  print(f'schedule is in {path}')
+  print(f'filename is {filename}')
   if not path.exists():
-    raise FileNotFoundError(f'Schedule file not found: {filename}')
+    raise FileNotFoundError(f'Schedule file not found: {filename} in {path}')
   
   with open(path, 'r', encoding='utf-8') as f:
     raw_schedule = json.load(f)

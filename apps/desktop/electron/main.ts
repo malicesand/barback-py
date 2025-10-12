@@ -12,8 +12,31 @@ import http from 'http';
 import { URL } from 'url';
 import readline from 'node:readline';
 
+let win: BrowserWindow | null = null;
+// --- custom helper ---
+function sendToRenderer(data: any) {
+  if (win && win.webContents) {
+    win.webContents.send('main:log', data);
+  } 
+};
 
+const nativeConsole = { ...console };
+(['log', 'info', 'warn', 'error'] as const).forEach((level) => {
+  console[level] = (...args: any[]) => {
+    // still print to Node console
+    nativeConsole[level](...args);
 
+    // also send to renderer
+    try {
+      sendToRenderer({
+        level,
+        args: args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
+      });
+    } catch (err) {
+      nativeConsole.warn('sendToRenderer failed', err);
+    }
+  };
+});
 // ------------------------- Preload Debug ------------------------- //
 // Preload exceptions 
 app.on('web-contents-created', (_e, contents) => {
@@ -27,19 +50,19 @@ app.on('web-contents-created', (_e, contents) => {
     console.error('[did-fail-load]', { code, desc, url });
   });
 });
-
 // catch errors forwarded from preload
 ipcMain.on('preload:error', (_e, msg) => console.error('[preload:error]', msg));
 
-
-
+// ------------------------- Config  ------------------------- //
+//! isDir bullshit especially with directory for data or whatever
 const RUNTIME_BASE = app.isPackaged
   ? process.resourcesPath               // Barback.app/Contents/Resources
   : process.cwd();                      // apps/desktop while dev
-if (app.isPackaged) app.setName('Barback-Desk3');
+if (app.isPackaged) app.setName('Barback Ingest Companion');
 
 const RESOURCES_DIR = path.join(RUNTIME_BASE, 'resources'); // packaged via extraResources
 const PYPROJ = path.join(RUNTIME_BASE, 'py-project');
+const DATA_DIR = path.join(PYPROJ, 'data');
 const CREDS_PATH = path.join(RESOURCES_DIR, 'credentials', 'oauth_client.json');
 
 const USERDATA_DIR = app.getPath('userData');               // writable
@@ -49,7 +72,8 @@ async function ensureTokenDir() {
   await fs.mkdir(path.dirname(TOKEN_PATH), { recursive: true }).catch(() => {});
 }
 
-async function ensureDefaultSchedules() {
+/* //! Think we don't need
+async function ensureDefaultSchedules() { 
   const src = path.join(RESOURCES_DIR, 'schedules'); // put defaults here
   const dst = path.join(USERDATA_DIR, 'schedules');
   await fs.mkdir(dst, { recursive: true }).catch(() => {});
@@ -60,11 +84,11 @@ async function ensureDefaultSchedules() {
       const to = path.join(dst, f);
       try { await fs.access(to); } catch { await fs.copyFile(from, to); }
     }
-  } catch { /* no bundled defaults – OK */ }
+  } catch {}
 }
-app.whenReady().then(ensureDefaultSchedules);
+app.whenReady().then(ensureDefaultSchedules); */
 
-// --------------------------- Google API --------------------------- //
+// --------------------------- Google Login --------------------------- //
 const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
 const TOKENS_FILE = path.join(app.getPath('userData'), 'google-oauth.enc')
 
@@ -80,7 +104,6 @@ async function loadClientJSON() {
   }
 }
 
-
 async function saveTokens(tokens: any) {
   const plaintext = JSON.stringify(tokens);
   // Encrypt if available; otherwise write plain
@@ -91,9 +114,10 @@ async function saveTokens(tokens: any) {
   await fs.writeFile(TOKENS_FILE, bytes);
 
 }
+
 // Restore tokens (if any)
 async function loadTokens(): Promise<any | null> {
-    console.log('[AUTH] loadTokens from', TOKENS_FILE);
+    // console.log('\n[AUTH] loadTokens from', TOKENS_FILE);
   if (!fssync.existsSync(TOKENS_FILE)) return null;
 
   const buf = await fs.readFile(TOKENS_FILE);
@@ -109,10 +133,9 @@ async function loadTokens(): Promise<any | null> {
   } else {
     jsonStr = buf.toString('utf8');
   }
-   console.log('[AUTH] token loaded OK');
+  //  console.log('[AUTH] token loaded OK');
   try { return JSON.parse(jsonStr); } catch { return null; }
 }
-
 
 function createOAuthClient(redirectUri: string, installed: any) {
   return new google.auth.OAuth2(
@@ -186,6 +209,7 @@ async function runLoopBackAuth(installed: any) {
   return client;
 }
 
+// --------------------------- Cal Connect --------------------------- //
 /**
  * Convert a Calendar API response to JSON shape
  * { [MEID] : [startISO, endISO] }
@@ -210,23 +234,30 @@ function toCalMap(events: calendar_v3.Schema$Events): Record<string, [string, st
   }
   return out;
 }
+
+//! going to make dir = dir
+//* Hypothesis Good For Dir
 /** Data Directory for JSON Imports */
 function isDev() {
   return !!process.env.VITE_DEV_SERVER_URL;
 }
 function getDataDir(): string {
   const devDir = path.join(__dirname, '../../../py-project/data/');
-  const prodDir = path.join(app.getPath('userData'), 'data');
+  const prodDir = DATA_DIR;
   const dir = isDev() ? devDir : prodDir;
   if (!fssync.existsSync(dir)) fssync.mkdirSync(dir, { recursive: true });
-  console.log('[MAIN] Uploaded')
+  console.log(`[MAIN] getDataDir: ${dir}`)
+  //logToRenderer(`[MAIN] getDataDir${dir}`)
   return dir;
-}
-
+} 
+//? maybe don't need getDataDir() bc prodDir = devDir
 async function writeCalendarJsonFile(baseName: string, json: string) {
   const dir = getDataDir();
   const filePath = path.join(dir, baseName);
   await fs.writeFile(filePath, json, 'utf8');
+  console.log(`\n[CAL] writeCalendarJsonFile(${baseName})`)
+   console.log(` dir: ${dir})`)
+   console.log(` filepath: ${filePath})`)
   return filePath;
 }
 // Fetch one calendar's events and return file path and calendar name
@@ -238,7 +269,6 @@ async function exportOneCalendarToDataDir(opts: {
 }) {
   const auth = await getAuthorizedClient();
   const calendar = google.calendar({ version: 'v3', auth });
-
   const [calMeta, evRes] = await Promise.all([
     calendar.calendars.get({ calendarId: opts.calendarId }),
     calendar.events.list({
@@ -250,44 +280,29 @@ async function exportOneCalendarToDataDir(opts: {
       orderBy: 'startTime',
     }),
   ]);
-
+  
   const calName = (calMeta.data.summary || 'calendar')
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_]/g, '');
-
+  .toLowerCase()
+  .replace(/\s+/g, '_')
+  .replace(/[^a-z0-9_]/g, '');
+  
   const calMap = toCalMap(evRes.data);
   const json = JSON.stringify(calMap, null, 2);
-
+  
   const baseName = opts.suggestName ?? `schedule_${calName.slice(0, 3)}.json`;
   const filePath = await writeCalendarJsonFile(baseName, json);
-
+  
+  console.log(`\n[CAL] exportOneCalendarToDataDir()`)
+  console.log(` filepath: ${filePath} `)
+  console.log(` calName: ${calName} \n`)
   return { ok: true as const, filePath, calName };
 }
 
-// type AuthOpts = {
-//   credentialsPath: string;
-//   tokenPath: string;
-//   openExternal?: (url: string) => void;
-// };
-
 async function getAuthorizedClient(): Promise<import('google-auth-library').OAuth2Client> {
-  //* Old
-  // const { installed } = await loadClientJSON();
-  // Try existing tokens with redirect URI
-  // const cached = await loadTokens();
-  // if (cached) {
-  //   const client = createOAuthClient('http://127.0.0.1', installed);
-  //   client.setCredentials(cached);
-  //   return client;
-  // }
-  // // Otherwise run the loopback login
-  //* New
-  // Try existing tokens with redirect URI
-  console.log('[AUTH] entering getAuthorizedClient');
+  //  console.log('\n[AUTH] entering getAuthorizedClient');
   const { installed } = await loadClientJSON();
   const cached = await loadTokens();
-  console.log('[AUTH] cached?', !!cached);
+  //  console.log('[AUTH] cached?', !!cached);
   if (cached) {
     // Use the first redirect URI from the client JSON
     const fallback = 'http://127.0.0.1';
@@ -303,29 +318,24 @@ async function getAuthorizedClient(): Promise<import('google-auth-library').OAut
 }
 
 function registerGoogleIpc() {
-  // console.log('[MAIN] registering Google IPC...');
-  // Connect and open Upload Window
+  // Connect and open Calendar Upload Window
+  console.log(`Data directory = ${DATA_DIR}`)
   ipcMain.handle('google:connectAndOpenUpload', async () => {
     try {
-    // make sure packaged creds exist
-    await fs.access(CREDS_PATH);
-  } catch {
-    throw new Error(`Missing Google credentials at ${CREDS_PATH}`);
-  }
-
-  await ensureTokenDir();
-
-  // Pass explicit paths to your auth layer
-  await getAuthorizedClient();
-  
-  openUploadWindow();
-  return { ok: true };
-    // await getAuthorizedClient(); // triggers login if needed
-    // openUploadWindow();
-    // // You can also return profile/calendar list here if you want
-    // return { ok: true };
+      // make sure packaged creds exist
+      await fs.access(CREDS_PATH);
+      console.log(`\n[MAIN] GoogleIPC Creds Path: ${CREDS_PATH})`)
+    } catch {
+      throw new Error(`Missing Google credentials at ${CREDS_PATH}`);
+    }
+    // Find or make token directory
+    await ensureTokenDir();
+    // Pass explicit paths to  auth layer
+    await getAuthorizedClient();
+    // Calendar upload window
+    openUploadWindow();
+    return { ok: true };
   });
-
   // List Calendars the user has access to (id + summary)
   ipcMain.handle('google:listCalendars', async () => {
     const auth = await getAuthorizedClient();
@@ -359,7 +369,7 @@ function registerGoogleIpc() {
     });
     return res.data
   });
-
+  //! This calls exportOneCalendarToDataDir
   /** Export ONE calendar to a JSON file shaped*/
   ipcMain.handle('google:exportCalendarJson', async (_evt, opts: {
     calendarId: string;
@@ -367,46 +377,22 @@ function registerGoogleIpc() {
     timeMax: string;
     suggestedFilename?: string; // e.g., 'schedule_jkb.json'
   }) => {
-    // const auth = await getAuthorizedClient();
-    // const calendar = google.calendar({ version: 'v3', auth});
-
+    console.log(`\n[ONE] exportCalendarJson(_evt, opts)`)
+    
     try {
-      const r = await exportOneCalendarToDataDir({
+      const r = await exportOneCalendarToDataDir({ 
         calendarId: opts.calendarId,
         timeMin: opts.timeMin,
         timeMax: opts.timeMax,
         suggestName: opts.suggestedFilename,
       });
+      // console.log(`\n[ONE] return 1 ${ {ok: true, filePath, calName} }`)
       return r; // { ok: true, filePath, calName }
+      // console.log(`\n   [ONE] return 2 ${ {ok: true, filePath, calName} }`)
     } catch (e: any) {
       return { ok: false as const, error: String(e?.message ?? e) };
     }
-    // const [calMeta, evRes] = await Promise.all([
-    //   calendar.calendars.get({ calendarId: opts.calendarId }),
-    //   calendar.events.list({
-    //     calendarId: opts.calendarId,
-    //     timeMin: opts.timeMin,
-    //     timeMax: opts.timeMax,
-    //     maxResults: 250,
-    //     singleEvents: true,
-    //     orderBy: 'startTime',
-    //   }),
-    // ]),
-
-    // const calMap = toCalMap(evRes.data); // renamed meidMap -> calMap
-    // const json = JSON.stringify(calMap, null, 2);
-
-    // // filename like 'schedule_<slug>.json'
-    // const calName = (calMeta.data.summary || 'calendar').toLowerCase()
-    //   .replace(/\s+/g, '_')
-    //   .replace(/[^a-z0-9_]/g, '');
-
-    // const baseName = opts.suggestedFilename ?? `schedule_${calName}.json`;
-    // const filePath = await writeCalendarJsonFile(baseName, json);
-
-    // return { ok: true as const, filePath, calName };
   });
-
   /** Export MULTIPLE calendars at once (shows save dialog for each) */
   ipcMain.handle('google:exportMultipleCalendarsJson', async (_evt, opts: {
     calendarIds: string[];
@@ -415,61 +401,34 @@ function registerGoogleIpc() {
   }) => {
     const results: Array<{ id: string; ok: boolean; filePath?: string; error?: string }> = [];
     for (const id of opts.calendarIds) {
+      console.log(`[IPC] exporting calendar`)
       try {
         const r = await exportOneCalendarToDataDir({
           calendarId: id,
           timeMin: opts.timeMin,
           timeMax: opts.timeMax,
         });
+        // console.log(`\n[EMC] 1 results.push(${ {id, ok: true, filePath: r.filePath} })`)
         results.push({ id, ok: true, filePath: r.filePath });
+        // console.log(`\n   [EMC] 2 results.push(${ {ok: true, filePath, calName} })`)
       } catch (e: any) {
         results.push({ id, ok: false, error: String(e?.message ?? e) });
       }
     }
+    // console.log(`\n[EMC]return `)
     return results;
   });
-  // console.log('[MAIN] registered ipcs')
 }
 
-// --- Electron Window  ---------------------------------------------
+// --------------------------- Electron Windows  --------------------------- //
 
 let py: import('child_process').ChildProcessWithoutNullStreams | null = null;
-let win: BrowserWindow | null = null;
+// let win: BrowserWindow | null = null;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 let uploadWin: BrowserWindow | null = null;
 //TODO theme stuff 
 // // const isDark = nativeTheme.shouldUseDarkColors;
-
-//TODO Dead code
-// function openUploadWindow() {
-//   if (uploadWin && !uploadWin.isDestroyed()) {
-//     uploadWin.show();
-//     uploadWin.focus();
-//     return;
-//   }
-//   uploadWin = new BrowserWindow({
-//     width: 960,
-//     height: 720,
-//     title: 'Google Calendar Upload',
-//     webPreferences: {
-//   preload: path.join(__dirname, 'preload.mjs'),
-//   contextIsolation: true,
-//   nodeIntegration: false,
-// }
-
-//   });
-//   // Route by hash (local host) in dev
-//   // In production load apps file/Url and route to upload
-//   if (process.env.VITE_DEV_SERVER_URL) {
-//     uploadWin.loadURL(`${process.env.VITE_DEV_SERVER_URL}#/upload`);
-//   } else {
-//     // adjust if you use file:// scheme from Vite build output
-//     uploadWin.loadURL(`app://index.html#/upload`);
-//   }
-
-//   uploadWin.on('closed', () => (uploadWin = null));
-// }
 
 function openUploadWindow() {
   if (uploadWin && !uploadWin.isDestroyed()) {
@@ -492,11 +451,12 @@ function openUploadWindow() {
   });
 
   const devUrl = process.env.VITE_DEV_SERVER_URL;
+  
 
   if (devUrl) {
     // Dev: Vite server — include the hash route
     uploadWin.loadURL(`${devUrl}#/upload`);
-    uploadWin.webContents.openDevTools({ mode: 'detach' });
+    // uploadWin.webContents.openDevTools({ mode: 'detach' });
   } else {
     // Prod: built file — use loadFile with hash option
     const indexHtml = path.join(__dirname, '../dist/index.html');
@@ -504,6 +464,7 @@ function openUploadWindow() {
   }
 
   uploadWin.once('ready-to-show', () => uploadWin?.show());
+  
 
   uploadWin.on('closed', () => {
     uploadWin = null as unknown as BrowserWindow; // or set to null if typed that way
@@ -514,22 +475,7 @@ function openUploadWindow() {
   });
 }
 
-// Ensure only one instance of the app runs
-// const gotLock = app.requestSingleInstanceLock();
-// if (!gotLock) {
-//   app.quit();
-//   process.exit(0);
-// } else {
-//   app.on("second-instance", () => {
-//     const [win] = BrowserWindow.getAllWindows();
-//     if (win) {
-//       if (win.isMinimized()) win.restore();
-//       win.focus();
-//     }
-//   });
-// }
-
-// Window Properties
+// Main Window Properties
 function createWindow() {
   if (win) return; // guard
   console.log('[main] creating window')
@@ -549,7 +495,7 @@ function createWindow() {
       nodeIntegration: false,
     }
   });
-
+  
   const devUrl = process.env.VITE_DEV_SERVER_URL;
   const isDev = !!devUrl;
 
@@ -565,7 +511,7 @@ function createWindow() {
   }
 
   win.once('ready-to-show', () => win?.show());
-
+  
   // helpful diagnostics if something fails to load
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
     console.error('did-fail-load:', { code, desc, url });
@@ -580,7 +526,7 @@ function createWindow() {
   // win.on('closed', () => (win = null)); //? needed ?
 }
 
-// -- Python Launch Code -------
+// --------------------------- Python Launch Code --------------------------- //
 function spawnPython() {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   
@@ -638,39 +584,23 @@ function spawnPython() {
   ipcMain.handle('ping', () => 'pong');
 };
 
-// ------------------------ Electron Window ------------------------ //
-// Open Window
+// ----------------------------- When Ready ----------------------------- //
 app.whenReady().then(() => {
   registerGoogleIpc();
   spawnPython();
-  // startPython(); //! dead?
   createWindow();
 
-  // console.log('[APP]', 'name=', app.getName());
+  // console.log('\n[APP]', 'name=', app.getName());
+  // console.log('[APP]', 'data dir=', DATA_DIR);
   // console.log('[APP]', 'userData=', app.getPath('userData'));
   // console.log('[APP]', 'resourcesPath=', process.resourcesPath);
-  // console.log('[AUTH]', 'TOKENS_FILE=', path.join(app.getPath('userData'), 'google-oauth.enc'));
+  // console.log('\n[AUTH]', 'TOKENS_FILE=', path.join(app.getPath('userData'), 'google-oauth.enc'));
 
   app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   });
-
-  //! Dead? renderer -> python (send command objects)
-  // ipcMain.handle('py:send', (_evt, payload: unknown) => {
-  //   if (!py || !py.stdin.writable) return false;
-  //   try {
-  //     py.stdin.write(JSON.stringify(payload) + '\n');
-  //     return true;
-  //   } catch {
-  //     return false;
-  //   }
-  // });
-
-  // app.on('before-quit', () => {
-  //  stopPython();
-  // });
-
-// App close behavior
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  //TODO this is got to change
+  // App close behavior
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
 });

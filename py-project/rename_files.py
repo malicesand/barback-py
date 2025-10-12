@@ -124,11 +124,13 @@ if __name__ == "__main__":
       
   '''
   Revision TODO List
-  # TODO prefix, photographer, and initials discrepancies
-  # TODO clean logs
+  
   #! run_log 
     # refactor function, function calls, and tsv headings (folder,prefix,start,end,result,status) to match
     # make time be time ran not start end
+    # Write to it no matter what (even if no matching prefix por ejemplo)
   #? Photo mechanic integration / finder opens
     # Or open finder from actions
+  #? prefix, photographer, and initials discrepancies
+    - Might be ok
   '''

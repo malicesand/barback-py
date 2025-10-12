@@ -109,7 +109,7 @@ SCRIPT_PATH = HERE / 'rename_files.py'
 def run_script(volume_path):
     try:
         send_event("rename_started", message=f'renaming {volume_path}', volume_path=volume_path)
-
+         
         if not SCRIPT_PATH.exists():
            send_event('rename_finished', volume_path=volume_path, ok=False, error=f'rename not found at {SCRIPT_PATH}')
            return
@@ -128,7 +128,7 @@ def run_script(volume_path):
               stderr=sys.stderr,
               text=True,
            )
-           sys.stderr.write(f"[WATCHER] renaming target={volume_path}\n"); sys.stderr.flush()
+           sys.stderr.write(f"[WATCHER] running at={SCRIPT_PATH}\n"); sys.stderr.flush()
            Path(os.path.join(volume_path, '.renamed')).touch()
            send_event("rename_finished", volume_path=volume_path, ok=True)
         except subprocess.CalledProcessError as e:

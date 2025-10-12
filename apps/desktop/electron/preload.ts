@@ -33,3 +33,12 @@ contextBridge.exposeInMainWorld('gcal', {
   exportCalendarJson: (opts: any) => ipcRenderer.invoke('google:exportCalendarJson', opts),
   exportMultipleCalendarsJson: (opts: any) => ipcRenderer.invoke('google:exportMultipleCalendarsJson', opts),
 });
+
+
+contextBridge.exposeInMainWorld('logs', {
+  onMainLog(cb: (msg: { level: string; args: any[] }) => void) {
+    const handler = (_e: any, msg: any) => cb(msg);
+    ipcRenderer.on('main:log', handler);
+    return () => ipcRenderer.off('main:log', handler);
+  },
+});
