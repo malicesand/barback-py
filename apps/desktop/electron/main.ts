@@ -1,19 +1,20 @@
 import { app, BrowserWindow, ipcMain, shell, safeStorage } from 'electron';
 import * as path from 'node:path';
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
+import { spawn } from 'child_process';
 import readline from 'readline';
 import { fileURLToPath } from "node:url";
 import { google, calendar_v3 } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
+// import { OAuth2Client } from 'google-auth-library'; //? Dead
 import fs from 'node:fs/promises';
 import fssync from 'fs';
-import { readFileSync, writeFileSync } from 'node:fs';
+// import { readFileSync, writeFileSync } from 'node:fs'; //? Dead
 import http from 'http';
 import { URL } from 'url';
 import readline from 'node:readline';
 
 let win: BrowserWindow | null = null;
-// --- custom helper ---
+
+// -------------- Print Logs in Renderer ------------- //
 function sendToRenderer(data: any) {
   if (win && win.webContents) {
     win.webContents.send('main:log', data);
@@ -37,7 +38,8 @@ const nativeConsole = { ...console };
     }
   };
 });
-// ------------------------- Preload Debug ------------------------- //
+
+// ------------------ Preload Debug ------------------ //
 // Preload exceptions 
 app.on('web-contents-created', (_e, contents) => {
     contents.on('preload-error', (_event, preloadPath, error) => {
@@ -53,8 +55,8 @@ app.on('web-contents-created', (_e, contents) => {
 // catch errors forwarded from preload
 ipcMain.on('preload:error', (_e, msg) => console.error('[preload:error]', msg));
 
-// ------------------------- Config  ------------------------- //
-//! isDir bullshit especially with directory for data or whatever
+// --------------------- Paths  ---------------------- //
+
 const RUNTIME_BASE = app.isPackaged
   ? process.resourcesPath               // Barback.app/Contents/Resources
   : process.cwd();                      // apps/desktop while dev
@@ -63,32 +65,14 @@ if (app.isPackaged) app.setName('Barback Ingest Companion');
 const RESOURCES_DIR = path.join(RUNTIME_BASE, 'resources'); // packaged via extraResources
 const PYPROJ = path.join(RUNTIME_BASE, 'py-project');
 const DATA_DIR = path.join(PYPROJ, 'data');
-const CREDS_PATH = path.join(RESOURCES_DIR, 'credentials', 'oauth_client.json');
-
 const USERDATA_DIR = app.getPath('userData');               // writable
-const TOKEN_PATH = path.join(USERDATA_DIR, 'google', 'token.json');
 
+// ------------------ Google Login ------------------- //
+const CREDS_PATH = path.join(RESOURCES_DIR, 'credentials', 'oauth_client.json');
+const TOKEN_PATH = path.join(USERDATA_DIR, 'google', 'token.json');
 async function ensureTokenDir() {
   await fs.mkdir(path.dirname(TOKEN_PATH), { recursive: true }).catch(() => {});
 }
-
-/* //! Think we don't need
-async function ensureDefaultSchedules() { 
-  const src = path.join(RESOURCES_DIR, 'schedules'); // put defaults here
-  const dst = path.join(USERDATA_DIR, 'schedules');
-  await fs.mkdir(dst, { recursive: true }).catch(() => {});
-  try {
-    const files = await fs.readdir(src);
-    for (const f of files) {
-      const from = path.join(src, f);
-      const to = path.join(dst, f);
-      try { await fs.access(to); } catch { await fs.copyFile(from, to); }
-    }
-  } catch {}
-}
-app.whenReady().then(ensureDefaultSchedules); */
-
-// --------------------------- Google Login --------------------------- //
 const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
 const TOKENS_FILE = path.join(app.getPath('userData'), 'google-oauth.enc')
 
@@ -209,7 +193,7 @@ async function runLoopBackAuth(installed: any) {
   return client;
 }
 
-// --------------------------- Cal Connect --------------------------- //
+// ------------------- Cal Connect -------------------- //
 /**
  * Convert a Calendar API response to JSON shape
  * { [MEID] : [startISO, endISO] }
@@ -420,7 +404,7 @@ function registerGoogleIpc() {
   });
 }
 
-// --------------------------- Electron Windows  --------------------------- //
+// ------------------ Electron Windows  --------------- //
 
 let py: import('child_process').ChildProcessWithoutNullStreams | null = null;
 // let win: BrowserWindow | null = null;
@@ -526,34 +510,50 @@ function createWindow() {
   // win.on('closed', () => (win = null)); //? needed ?
 }
 
-// --------------------------- Python Launch Code --------------------------- //
+// ----------------- Python Launch Code --------------- //* New
 function spawnPython() {
-  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   
-  const scriptPath = app.isPackaged ? path.join(PYPROJ, 'watch_card.py') : path.join(__dirname, '../../../py-project/watch_card.py')
-  console.log('[PY] scriptPath', scriptPath, 'exists?', fssync.existsSync(scriptPath));
-  // Python to access on open
-  py = spawn(pythonCmd, [scriptPath], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  //const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'; //! works
+  const python = app.isPackaged //* New
+    ? path.join(RUNTIME_BASE, 'py-venv', 'bin', 'python3')   // embedded venv
+    : (process.platform === 'win32' ? 'python' : 'python3'); // dev
 
-  // Parse stdout as NDJSON
-  const rl = readline.createInterface({ input: py.stdout });
-  rl.on('line', (line) => {
+  // const scriptPath = app.isPackaged ? path.join(PYPROJ, 'watch_card.py') : path.join(__dirname, '../../../py-project/watch_card.py') //! works
+  const scriptPath = path.join(PYPROJ, 'watch_card.py'); //* New
+  
+  const exiftoolPath = app.isPackaged //* New
+    ? path.join(RUNTIME_BASE, 'exiftool', 'exiftool')        // bundled
+    : 'exiftool';                                            // dev PATH/Homebrew
+
+  const env = { //* New
+    ...process.env,
+    // keep your existing dirs available to Python
+    APP_RESOURCES: RESOURCES_DIR,  // your packaged resources/
+    PY_PROJECT: PYPROJ,
+    DATA_DIR,
+    USERDATA_DIR,
+    EXIFTOOL_PATH: exiftoolPath,
+    PATH: [
+      app.isPackaged ? path.dirname(python) : '',
+      '/usr/bin','/bin','/usr/sbin','/sbin',
+      '/usr/local/bin','/opt/homebrew/bin'
+    ].filter(Boolean).join(':'),
+  };
+
+  // py = spawn(pythonCmd, [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'], }); //! works
+  py = spawn(python, [scriptPath], { stdio: ['pipe','pipe','pipe'], env }); //* New
+
+  /* set python logs to print to dev console */
+  const rl = readline.createInterface({ input: py.stdout }); rl.on('line', (line) => {
     try {
-      const msg = JSON.parse(line);
+      const msg = JSON.parse(line); // Parse stdout as NDJSON
       if (win) win.webContents.send('py:event', msg);
     } catch {
       if (win) win.webContents.send('py:event', { type: 'error', error: 'invalid_json', raw: line });
-      //!If Python prints anything non-JSON, forward as a debug event
-      // win?.webContents.send('py:event', { type: 'debug', line });
     }
   })
-
-  //  ------------------------- stderr ------------------------- //
-  // set python logs to print to devConsole
+  
   py.stderr.setEncoding('utf8');
-
   let errBuf = '';
 
   py.stderr.on('data', (chunk: string) => {
@@ -580,8 +580,8 @@ function spawnPython() {
     py.stdin.write(JSON.stringify(payload) + '\n');
     return true;
   });
-
   ipcMain.handle('ping', () => 'pong');
+
 };
 
 // ----------------------------- When Ready ----------------------------- //

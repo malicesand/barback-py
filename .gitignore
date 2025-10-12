@@ -69,3 +69,9 @@ lerna-debug.log*
 
 # ESLint Cache
 .eslintcache
+
+# Python runtime and venv 
+**/vendor/python-framework/
+**/vendor/python-universal2/
+**/vendor/py-venv/
+**/vendor/python-runtime.tar.*

@@ -1,1 +1,41 @@
-"use strict";const n=require("electron"),d=new Set;n.ipcRenderer.on("py:event",(e,r)=>{for(const o of d)o(r)});n.contextBridge.exposeInMainWorld("pybridge",{sendToPython(e){return n.ipcRenderer.invoke("py:send",e)},onPythonEvent(e){return d.add(e),()=>d.delete(e)},onPythonStderr(e){const r=(o,t)=>{try{e(String(t))}catch(i){console.error("[py:stderr cb error",i)}};return n.ipcRenderer.on("py:stderr",r),()=>n.ipcRenderer.off("py:stderr",r)},ping:()=>n.ipcRenderer.invoke("ping")});n.contextBridge.exposeInMainWorld("gcal",{googleConnectAndOpenUpload:()=>n.ipcRenderer.invoke("google:connectAndOpenUpload"),listCalendars:()=>n.ipcRenderer.invoke("google:listCalendars"),fetchEvents:e=>n.ipcRenderer.invoke("google:fetchEvents",e),exportCalendarJson:e=>n.ipcRenderer.invoke("google:exportCalendarJson",e),exportMultipleCalendarsJson:e=>n.ipcRenderer.invoke("google:exportMultipleCalendarsJson",e)});n.contextBridge.exposeInMainWorld("logs",{onMainLog(e){const r=(o,t)=>e(t);return n.ipcRenderer.on("main:log",r),()=>n.ipcRenderer.off("main:log",r)}});
+"use strict";
+const electron = require("electron");
+const PyListeners = /* @__PURE__ */ new Set();
+electron.ipcRenderer.on("py:event", (_e, data) => {
+  for (const fn of PyListeners) fn(data);
+});
+electron.contextBridge.exposeInMainWorld("pybridge", {
+  sendToPython(payload) {
+    return electron.ipcRenderer.invoke("py:send", payload);
+  },
+  onPythonEvent(listener) {
+    PyListeners.add(listener);
+    return () => PyListeners.delete(listener);
+  },
+  onPythonStderr(cb) {
+    const handler = (_e, chunk) => {
+      try {
+        cb(String(chunk));
+      } catch (err) {
+        console.error("[py:stderr cb error", err);
+      }
+    };
+    electron.ipcRenderer.on("py:stderr", handler);
+    return () => electron.ipcRenderer.off("py:stderr", handler);
+  },
+  ping: () => electron.ipcRenderer.invoke("ping")
+});
+electron.contextBridge.exposeInMainWorld("gcal", {
+  googleConnectAndOpenUpload: () => electron.ipcRenderer.invoke("google:connectAndOpenUpload"),
+  listCalendars: () => electron.ipcRenderer.invoke("google:listCalendars"),
+  fetchEvents: (opts) => electron.ipcRenderer.invoke("google:fetchEvents", opts),
+  exportCalendarJson: (opts) => electron.ipcRenderer.invoke("google:exportCalendarJson", opts),
+  exportMultipleCalendarsJson: (opts) => electron.ipcRenderer.invoke("google:exportMultipleCalendarsJson", opts)
+});
+electron.contextBridge.exposeInMainWorld("logs", {
+  onMainLog(cb) {
+    const handler = (_e, msg) => cb(msg);
+    electron.ipcRenderer.on("main:log", handler);
+    return () => electron.ipcRenderer.off("main:log", handler);
+  }
+});
