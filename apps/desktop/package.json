@@ -8,9 +8,11 @@
     "clean": "rimraf dist dist-electron release",
     "dev": "vite",
     "dev:electron": "cross-env NODE_ENV=development vite & wait-on tcp:5173 && electron .",
-    "build": "npm run clean && vite build",
+    "build:renderer": "vite build",
+    "build": "npm run clean && npm run build:renderer && npx electron-builder --mac dir zip dmg --publish never -c.mac.identity=null",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder",
+     "dist": "npx electron-builder --mac dir zip dmg --publish never -c.mac.identity=null",
+     "release:zip": "xattr -cr 'release/mac/Barback.app' && (cd release/mac && zip -r ../Barback-clean-mac.zip Barback.app)",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -48,42 +50,54 @@
     "productName": "Barback",
     "files": [
       "dist/**",
-      "dist-electron/**",
-      "!**/*.map"
+      "dist-electron/**", 
+      "packages/**",
+      "!**/*.map",
+      "py-project/**",
+      "!vendor/**"
     ],
     "directories": {
       "output": "release"
     },
     "asar": true,
     "asarUnpack": [
-      "resources/**",
-      "**/*.py"
+      "py-project/**",
+      "resources/**"
     ],
     "mac": {
       "category": "public.app-category.photography",
-      "target": ["dir", "zip", "dmg"],
-      "identity": null,              
-      "hardenedRuntime": false,      
+      "target": [
+        "dir",
+        "zip",
+        "dmg"
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
       "entitlements": null,
       "entitlementsInherit": null,
       "gatekeeperAssess": false
     },
-    "afterSign": null,
-    "win": {
-      "target": [
-        "nsis"
-      ]
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ]
-    },
     "extraResources": [
-      { "from": "vendor/py-venv", "to": "py-venv" },
-      { "from": "vendor/exiftool/mac/exiftool",   "to": "exiftool/exiftool" },
-      { "from": "../../py-project/",  "to": "py-project" },
-      { "from": "resources/","to": "resources" }
+      {
+        "from": "vendor/python-framework/Python.framework",
+        "to": "python-framework/Python.framework"
+      },
+      {
+        "from": "vendor/py-venv",
+        "to": "py-venv"
+      },
+      {
+        "from": "vendor/exiftool/mac/exiftool",
+        "to": "exiftool/exiftool"
+      },
+      {
+        "from": "resources/",
+        "to": "resources"
+      },
+      {
+        "from": "../../py-project/",
+        "to": "py-project"
+      }
     ]
   }
 }

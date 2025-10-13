@@ -1,7 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, safeStorage } from 'electron';
 import * as path from 'node:path';
 import { spawn } from 'child_process';
-import readline from 'readline';
 import { fileURLToPath } from "node:url";
 import { google, calendar_v3 } from 'googleapis';
 import fs from 'node:fs/promises';
@@ -57,9 +56,41 @@ app.on('web-contents-created', (_e, contents) => {
 });
 // catch errors forwarded from preload
 ipcMain.on('preload:error', (_e, msg) => console.error('[preload:error]', msg));
-
 // --------------------- Paths  ---------------------- //
+const isPackaged = app.isPackaged;
 
+// __dirname here points to dist-electron at runtime
+const DEV_ROOT = path.resolve(__dirname, '../../..'); // repo root (…/barback-py)
+const DESKTOP_ROOT = path.join(DEV_ROOT, 'apps', 'desktop');
+
+const RES = isPackaged ? process.resourcesPath : DESKTOP_ROOT; // base for resources/vendor in dev
+
+// Python project (your scripts)
+const PY_PROJECT = isPackaged
+  ? path.join(RES, 'py-project')
+  : path.join(DEV_ROOT, 'py-project');
+
+// Credentials/resources (oauth_client.json etc.)
+const RESOURCES_DIR = isPackaged
+  ? path.join(RES, 'resources')
+  : path.join(DESKTOP_ROOT, 'resources');
+
+// Bundled Python.framework (we will spawn this directly)
+const PY_FRAME = isPackaged
+  ? path.join(RES, 'python-framework', 'Python.framework', 'Versions', '3.13')
+  : path.join(DESKTOP_ROOT, 'vendor', 'python-framework', 'Python.framework', 'Versions', '3.13');
+
+const PYTHON_BIN = path.join(PY_FRAME, 'bin', 'python3.13');
+
+// ExifTool
+const EXIFTOOL_BIN = isPackaged
+  ? path.join(RES, 'exiftool', 'exiftool')
+  : 'exiftool';
+
+// Data dir (schedule JSONs)
+const DATA_DIR = path.join(PY_PROJECT, 'data');
+/* // --------------------- Paths  ---------------------- // ! OLD
+const isPackaged = app.isPackaged;
 const DEV_ROOT = path.resolve(__dirname, '../../..'); // dist-electron/main -> repo root 
 const RUNTIME_BASE = app.isPackaged 
   ? process.resourcesPath               // Barback.app/Contents/Resources
@@ -70,8 +101,24 @@ const RESOURCES_DIR = app.isPackaged //New
   ? path.join(RUNTIME_BASE, 'resources') // Barback.app/Contents/Resources/resources
   : path.join(process.cwd(), 'resources'); // apps/desktop/resource/credentials 
 
+  // const PY_FRAME = path.join(RESOURCES_DIR, "python-framework", "Python.framework", "Versions", "3.13");
+const PY_FRAME = isPackaged
+  ? path.join(RES, "python-framework", "Python.framework", "Versions", "3.13")
+  : path.join(RES, "vendor", "python-framework", "Python.framework", "Versions", "3.13");
+const PYTHON_BIN = path.join(PY_FRAME, "bin", "python3.13");
 const DATA_DIR = path.join(PYPROJ, 'data'); // schedule JSONs and TSV
+const child = spawn(PYTHON_BIN, [path.join(PYPROJ, "watch_card.py")], {
+  stdio: "pipe",
+  env: {
+    ...process.env,
+    PYTHONHOME: PY_FRAME,
+    PYTHONPATH: path.join(PY_FRAME, "lib", "python3.13")
+  }
+});
 
+// const RES = process.resourcesPath;
+const PY_VENV = path.join(RESOURCES_DIR, "py-venv");
+// const PYTHON_BIN = path.join(PY_VENV, "bin", "python3"); */
 // ------------------- Read Data  ----------------- //
 
 ipcMain.handle('read-schedules', async () => {
@@ -513,8 +560,82 @@ function createWindow() {
   // win.on('closed', () => (win = null)); //? needed ?
 }
 
-// ----------------- Python Launch Code --------------- //
+// ----------------- Python Launch Code --------------- 
+// 
 function spawnPython() {
+  const scriptPath = path.join(PY_PROJECT, 'watch_card.py');
+
+  console.log('\n[DEV?]', !isPackaged);
+  console.log('[PYTHON]', PYTHON_BIN);
+  console.log('[SCRIPT]', scriptPath, 'exists?', fssync.existsSync(scriptPath));
+
+  const env = {
+    ...process.env,
+    // let Python know its home/libs
+    PYTHONHOME: PY_FRAME,
+    PYTHONPATH: path.join(PY_FRAME, 'lib', 'python3.13'),
+    // app paths your script might need
+    APP_RESOURCES: RESOURCES_DIR,
+    PY_PROJECT: PY_PROJECT,
+    DATA_DIR,
+    USERDATA_DIR,
+    EXIFTOOL_PATH: EXIFTOOL_BIN,
+    // conservative PATH so sub-processes can find basic tools in dev
+    PATH: [
+      path.dirname(PYTHON_BIN),
+      '/usr/bin','/bin','/usr/sbin','/sbin',
+      '/usr/local/bin','/opt/homebrew/bin'
+    ].join(':'),
+  };
+
+  py = spawn(PYTHON_BIN, [scriptPath], { stdio: ['pipe','pipe','pipe'], env });
+
+  py.on('error', (err) => {
+    console.error('[PY ERROR]', err);
+    if (win) win.webContents.send('py:stderr', String(err));
+  });
+
+  const rl = readline.createInterface({ input: py.stdout });
+  rl.on('line', (line) => {
+    try {
+      const msg = JSON.parse(line);
+      win?.webContents.send('py:event', msg);
+    } catch {
+      win?.webContents.send('py:event', { type: 'log', raw: line });
+    }
+  });
+
+  py.stderr.setEncoding('utf8');
+  let errBuf = '';
+  py.stderr.on('data', (chunk: string) => {
+    errBuf += chunk;
+    for (;;) {
+      const nl = errBuf.indexOf('\n');
+      if (nl < 0) break;
+      const line = errBuf.slice(0, nl).replace(/\r$/, '');
+      errBuf = errBuf.slice(nl + 1);
+      win?.webContents.send('py:stderr', line);
+    }
+  });
+
+  py.on('exit', (code, signal) => {
+    console.warn(`[PY EXIT] code=${code} signal=${signal}`);
+    win?.webContents.send('py:event', { type: 'py_exit', code, signal });
+    py = null;
+  });
+
+  ipcMain.handle('py:send', (_evt, payload: unknown) => {
+    if (!py) throw new Error('Python not running');
+    py.stdin.write(JSON.stringify(payload) + '\n');
+    return true;
+  });
+
+  ipcMain.handle('ping', () => 'pong');
+}
+
+
+//!OLD
+/* function spawnPython() {
 
   const python = app.isPackaged 
     ? path.join(RUNTIME_BASE, 'py-venv', 'bin', 'python3')   // embedded venv
@@ -561,7 +682,7 @@ function spawnPython() {
     if (win) win.webContents.send('py:stderr', String(err));
   });
 
-  /* set python logs to print to dev console */
+  /* set python logs to print to dev console 
   const rl = readline.createInterface({ input: py.stdout }); rl.on('line', (line) => {
     try {
       const msg = JSON.parse(line); // Parse stdout as NDJSON
@@ -600,7 +721,7 @@ function spawnPython() {
   });
   ipcMain.handle('ping', () => 'pong');
 
-};
+}; */
 
 // -------------------- When Ready -------------------- //
 app.whenReady().then(() => {
@@ -619,6 +740,6 @@ app.whenReady().then(() => {
   });
   //TODO this is got to change
   // App close behavior
-  app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
-});
+  // app.on('window-all-closed', () => {
+  //   if (process.platform !== 'darwin') app.quit();
+// });
