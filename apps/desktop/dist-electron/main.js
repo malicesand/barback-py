@@ -2,7 +2,7 @@ import "electron";
 import "node:path";
 import "child_process";
 import "node:url";
-import "./main-Rbi_bIC0.js";
+import "./main-CKuPzGbW.js";
 import "node:fs/promises";
 import "fs";
 import "http";

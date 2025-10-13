@@ -152,6 +152,10 @@ declare global {
       listIpc: () => Promise<string[]>;
       /** (optional) quick health check */
       ping?: () => Promise<{ ok: true; pid: number; ts?: number }>;
+    };
+
+    data: {
+      readSchedules: () => Promise<Array<{ title: string}>>;
     }
   }
 }

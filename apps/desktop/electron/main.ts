@@ -4,10 +4,8 @@ import { spawn } from 'child_process';
 import readline from 'readline';
 import { fileURLToPath } from "node:url";
 import { google, calendar_v3 } from 'googleapis';
-// import { OAuth2Client } from 'google-auth-library'; //? Dead
 import fs from 'node:fs/promises';
 import fssync from 'fs';
-// import { readFileSync, writeFileSync } from 'node:fs'; //? Dead
 import http from 'http';
 import { URL } from 'url';
 import readline from 'node:readline';
@@ -16,9 +14,9 @@ let win: BrowserWindow | null = null;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-const APP_NAME = app.isPackaged //TODO AUTH checks
-  ? app.setName('Barback prod beta 1') 
-  : app.setName('Barback dev beta 2')
+const APP_NAME = app.isPackaged 
+  ? app.setName('Barback-Prod-1') 
+  : app.setName('Barback-Dev-2')
 // -------------- Print Logs in Renderer ------------- //
 function sendToRenderer(data: any) {
   if (win && win.webContents) {
@@ -60,21 +58,31 @@ app.on('web-contents-created', (_e, contents) => {
 // catch errors forwarded from preload
 ipcMain.on('preload:error', (_e, msg) => console.error('[preload:error]', msg));
 
-// --------------------- Paths  ---------------------- //*New
+// --------------------- Paths  ---------------------- //
 
-const DEV_ROOT = path.resolve(__dirname, '../../..'); // dist-electron/main -> repo root //?Root in dev 1
-
-const RUNTIME_BASE = app.isPackaged //?Root could rename
+const DEV_ROOT = path.resolve(__dirname, '../../..'); // dist-electron/main -> repo root 
+const RUNTIME_BASE = app.isPackaged 
   ? process.resourcesPath               // Barback.app/Contents/Resources
-  : DEV_ROOT;                           //?Root in dev 2
+  : DEV_ROOT;                           //Root in dev 
 
 const PYPROJ = path.join(RUNTIME_BASE, 'py-project'); // Production and Dev Python Script Directory 
-// const RESOURCES_DIR = path.join(RUNTIME_BASE, 'resources'); // packaged via extraResources //Old
 const RESOURCES_DIR = app.isPackaged //New
   ? path.join(RUNTIME_BASE, 'resources') // Barback.app/Contents/Resources/resources
-  : path.join(process.cwd(), 'resources'); /* apps/desktop/resource/credentials */ //*New
+  : path.join(process.cwd(), 'resources'); // apps/desktop/resource/credentials 
 
 const DATA_DIR = path.join(PYPROJ, 'data'); // schedule JSONs and TSV
+
+// ------------------- Read Data  ----------------- //
+
+ipcMain.handle('read-schedules', async () => {
+  const files = await fs.readdir(DATA_DIR).catch(() => []);
+  console.log(`[main] Data Files ${files}`)
+  return files;
+});
+
+
+
+
 
 // ------------------ Google Login ------------------- //
 const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
@@ -505,18 +513,16 @@ function createWindow() {
   // win.on('closed', () => (win = null)); //? needed ?
 }
 
-// ----------------- Python Launch Code --------------- //* New
+// ----------------- Python Launch Code --------------- //
 function spawnPython() {
 
-  //const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'; //? Old
-  const python = app.isPackaged //* New
+  const python = app.isPackaged 
     ? path.join(RUNTIME_BASE, 'py-venv', 'bin', 'python3')   // embedded venv
     : (process.platform === 'win32' ? 'python' : 'python3'); // dev
 
-  // const scriptPath = app.isPackaged ? path.join(PYPROJ, 'watch_card.py') : path.join(__dirname, '../../../py-project/watch_card.py') //?Old
-  const scriptPath = path.join(PYPROJ, 'watch_card.py'); //* New
+  const scriptPath = path.join(PYPROJ, 'watch_card.py'); 
   
-  const exiftoolPath = app.isPackaged //* New
+  const exiftoolPath = app.isPackaged 
     ? path.join(RUNTIME_BASE, 'exiftool', 'exiftool')        // bundled
     : 'exiftool';                                            // dev PATH/Homebrew
 
@@ -596,7 +602,7 @@ function spawnPython() {
 
 };
 
-// ----------------------------- When Ready ----------------------------- //
+// -------------------- When Ready -------------------- //
 app.whenReady().then(() => {
   registerGoogleIpc();
   spawnPython();
