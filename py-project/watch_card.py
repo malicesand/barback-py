@@ -36,8 +36,9 @@ def _natural_key(s: str): # natural sort by folder name commonly used by cameras
     import re
     return [int(t) if t.isdigit() else t.lower() for t in re.findall(r'\d+|\D+', s)]
 
-def relevant_cards_snapshot():
+def _scan_volumes():
    cards = []
+   renamed = []
    for vol in os.listdir('/Volumes'):
         vol_lower = vol.lower()
         with SESSION_LOCK:
@@ -58,7 +59,27 @@ def relevant_cards_snapshot():
               'dcim_path': dcim_path,
               'folder_count': folder_count
            })
+           continue
+        elif os.path.exists(renamed_marker):
+           folder_count = sum(1 for e in os.scandir(dcim_path) if e.is_dir()) if os.path.isdir(dcim_path) else None
+           renamed.append({
+                'volume_name': vol,
+                'volume_path': vol_path,
+                'dcim_path': dcim_path if os.path.isdir(dcim_path) else None,
+                'folder_count': folder_count
+            })
+      
+   return cards, renamed
+
+def relevant_cards_snapshot():
+   cards, renamed = _scan_volumes()
    return cards
+
+def list_renamed_cards():
+    _cards, renamed = _scan_volumes()
+    return renamed
+   
+
 # Show DCIM Children
 def list_dcim_folders(dcim_path: str, include_counts=True, max_entries=500):
     # safety: only allow paths under /Volumes/*/DCIM
@@ -160,7 +181,7 @@ def act_mark_ignored(data):
 
    return {'ok': True, 'volume_name': name}
 
-def act_unignore(data): 
+def act_unignore(data): #TODO
    name = (data.get('volume_name') or '').lower()
    if not name:
       return {'ok': False, 'error': 'Missing volume_name'}
@@ -168,12 +189,15 @@ def act_unignore(data):
       if name in SESSION_IGNORES:
          SESSION_IGNORES.remove(name)
    return {'ok': True, 'volume_name': name}
-# Get DCIM Info
+
 def act_cards_list_dcim(data): 
    dcim_path = data.get('dcim_path')
    include_counts = bool(data.get('include_counts', True))
    folders = list_dcim_folders(dcim_path, include_counts=include_counts)
    return {'ok': True, 'dcim_path': dcim_path, 'folders': folders}
+
+def act_renamed_list(data):
+   return {'ok': True, 'cards': list_renamed_cards()}
 
 ACTIONS = {
    'cards/snapshot': act_cards_snapshot,
@@ -181,12 +205,14 @@ ACTIONS = {
    'mark-ignored': act_mark_ignored,
    'unignore': act_unignore,
    'cards/list_dcim': act_cards_list_dcim,
+   'list/renamed': act_renamed_list,
 }
 
 ALIASES = {
    'list_dcim': 'cards/snapshot',
    'run_rename': 'run-rename',
    'mark_ignored': 'mark-ignored',
+   'list_renamed': 'list/renamed'
 }
 
 def stdin_command_loop(stop_event: Event):

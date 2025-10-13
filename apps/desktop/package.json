@@ -1,7 +1,7 @@
 {
   "name": "barback-desktop",
   "private": true,
-  "version": "0.0.1",
+  "version": "1.0.1",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -60,12 +60,15 @@
       "**/*.py"
     ],
     "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "hardenedRuntime": false
+      "category": "public.app-category.photography",
+      "target": ["dir", "zip", "dmg"],
+      "identity": null,              
+      "hardenedRuntime": false,      
+      "entitlements": null,
+      "entitlementsInherit": null,
+      "gatekeeperAssess": false
     },
+    "afterSign": null,
     "win": {
       "target": [
         "nsis"

@@ -16,6 +16,7 @@ export default function CardsPanel() {
   const [loadingFolders, setLoadingFolders] = useState<Record<string, boolean>>({}); // dcim_path -> loading
   const [foldersByDcim, setFoldersByDcim] = useState<Record<string, DcimFolder[]>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({}); // dcim_path -> expanded
+  const [renamed, setRenamed] = useState<Card[]>([]);
 
   useEffect(() => {
      const off = window.pybridge.onPythonEvent((msg: any) => {
@@ -48,6 +49,11 @@ export default function CardsPanel() {
           setExpanded(prev => ({ ...prev, [dcim]: true }));
           return;
         }
+        
+        case 'list/renamed': {
+          setRenamed(Array.isArray(msg.cards) ? msg.cards : []);
+          return;
+        }
 
         case 'error':
           console.warn('Python error:', msg.message ?? msg.detail ?? msg);
@@ -61,6 +67,7 @@ export default function CardsPanel() {
   // Initial fetch (support new + legacy)
   window.pybridge.sendToPython({ cmd: 'cards/snapshot' }).catch(() => {});
   window.pybridge.sendToPython({ cmd: 'list_dcim' }).catch(() => {});
+  window.pybridge.sendToPython({ cmd: 'list/renamed' }).catch(() => {});
 
   // Surface stderr for debugging
   const offErr = window.pybridge.onPythonStderr?.((chunk) => {
@@ -152,7 +159,7 @@ export default function CardsPanel() {
                   {busy[c.volume_path] ? 'Renaming…' : 'Run rename'}
                 </button>
 
-                <button onClick={() => ignore(c)}>Ignore</button>
+                {/* <button onClick={() => ignore(c)}>Ignore</button> */}
               </div>
 
               {/* Folder list */}
@@ -187,6 +194,18 @@ export default function CardsPanel() {
             </div>
           );
         })}
+      </div>
+      <div style={{
+        display: 'grid',
+        gap: 12,
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))'
+      }}> Renamed
+        <ul>
+          {renamed.map(r => {
+            return(
+            <li key={r.volume_path}>{r.volume_name}</li>
+          )})}
+        </ul>
       </div>
     </div>
   );

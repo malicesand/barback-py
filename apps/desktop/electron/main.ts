@@ -15,8 +15,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const APP_NAME = app.isPackaged 
-  ? app.setName('Barback-Prod-1') 
-  : app.setName('Barback-Dev-2')
+  ? app.setName('Barback-Ingest-Companion') 
+  : app.setName('Barback-Dev-5')
 // -------------- Print Logs in Renderer ------------- //
 function sendToRenderer(data: any) {
   if (win && win.webContents) {

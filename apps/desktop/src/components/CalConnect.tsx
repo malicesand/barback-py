@@ -6,7 +6,6 @@ import { type Calendar } from '../global.d.ts';
 export default function CallConnect() {
   const [calendars, setCalendars] = useState<Calendar[]>([])
   const [selected, setSelected] = useState<string[]>([])
-  // const [files, setFiles] = useState<string[]>([]) // everything in data/
   const [schedules, setSchedules] = useState<string[]>([]) 
   
   
@@ -16,11 +15,8 @@ export default function CallConnect() {
 
   const getSchedules = useCallback(async() => {
     const files = await window.data.readSchedules();
-    // setFiles(files);
-
     const schedules = files.filter(file => file.endsWith('.json'));
     setSchedules(schedules);
-    
   }, []);
 
   async function saveSelected(selected: string[]) {
@@ -30,19 +26,15 @@ export default function CallConnect() {
     await window.gcal.exportMultipleCalendarsJson({calendarIds, timeMin, timeMax})
     getSchedules();
   }
+
   useEffect(() => {
     getCalendars();
     getSchedules()
   },  [getSchedules]);
 
-  // useEffect(() => {
-  //   getSchedules();
-  // }, []);
-  
-
    return (
       <div style={{ padding: 16, fontFamily: 'system-ui' }}>
-        <h1>Big Hog</h1>
+        <h1>Turts Alerts</h1>
         <div>
           {calendars.map(c => {
             const checked = selected.includes(c.id)
