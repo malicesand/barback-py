@@ -13,7 +13,12 @@ import { URL } from 'url';
 import readline from 'node:readline';
 
 let win: BrowserWindow | null = null;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
 
+const APP_NAME = app.isPackaged //TODO AUTH checks
+  ? app.setName('Barback prod beta 1') 
+  : app.setName('Barback dev beta 2')
 // -------------- Print Logs in Renderer ------------- //
 function sendToRenderer(data: any) {
   if (win && win.webContents) {
@@ -55,30 +60,38 @@ app.on('web-contents-created', (_e, contents) => {
 // catch errors forwarded from preload
 ipcMain.on('preload:error', (_e, msg) => console.error('[preload:error]', msg));
 
-// --------------------- Paths  ---------------------- //
+// --------------------- Paths  ---------------------- //*New
 
-const RUNTIME_BASE = app.isPackaged
+const DEV_ROOT = path.resolve(__dirname, '../../..'); // dist-electron/main -> repo root //?Root in dev 1
+
+const RUNTIME_BASE = app.isPackaged //?Root could rename
   ? process.resourcesPath               // Barback.app/Contents/Resources
-  : process.cwd();                      // apps/desktop while dev
-if (app.isPackaged) app.setName('Barback Ingest Companion');
+  : DEV_ROOT;                           //?Root in dev 2
 
-const RESOURCES_DIR = path.join(RUNTIME_BASE, 'resources'); // packaged via extraResources
-const PYPROJ = path.join(RUNTIME_BASE, 'py-project');
-const DATA_DIR = path.join(PYPROJ, 'data');
-const USERDATA_DIR = app.getPath('userData');               // writable
+const PYPROJ = path.join(RUNTIME_BASE, 'py-project'); // Production and Dev Python Script Directory 
+// const RESOURCES_DIR = path.join(RUNTIME_BASE, 'resources'); // packaged via extraResources //Old
+const RESOURCES_DIR = app.isPackaged //New
+  ? path.join(RUNTIME_BASE, 'resources') // Barback.app/Contents/Resources/resources
+  : path.join(process.cwd(), 'resources'); /* apps/desktop/resource/credentials */ //*New
+
+const DATA_DIR = path.join(PYPROJ, 'data'); // schedule JSONs and TSV
 
 // ------------------ Google Login ------------------- //
-const CREDS_PATH = path.join(RESOURCES_DIR, 'credentials', 'oauth_client.json');
-const TOKEN_PATH = path.join(USERDATA_DIR, 'google', 'token.json');
-async function ensureTokenDir() {
+const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
+const CREDS_PATH = path.join(RESOURCES_DIR, 'credentials', 'oauth_client.json'); // Cloud Console Client Creds
+
+// TODO AUTH //
+const USERDATA_DIR = app.getPath('userData'); //dev= App_NAME/ : prod=
+const TOKEN_PATH = path.join(USERDATA_DIR, 'google', 'token.json'); //dev=APP_NAME/google/token.json 
+
+async function ensureTokenDir() { 
   await fs.mkdir(path.dirname(TOKEN_PATH), { recursive: true }).catch(() => {});
 }
-const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
-const TOKENS_FILE = path.join(app.getPath('userData'), 'google-oauth.enc')
+const TOKENS_FILE = path.join(app.getPath('userData'), 'google-oauth.enc') //dev=APP_NAME/google-oauth.enc
 
 // Load Desktop OAuth client (client_id, client_secret, redirect_uris)
-async function loadClientJSON() {
-  const prodCreds = path.join(process.resourcesPath, 'resources', 'credentials', 'oauth_client.json');
+async function loadClientJSON() { //? Refactor
+  const prodCreds = path.join(process.resourcesPath, 'resources', 'credentials', 'oauth_client.json'); 
   const devCreds  = path.join(process.cwd(), 'credentials', 'oauth_client.json'); // your dev copy
 
   try {
@@ -219,8 +232,6 @@ function toCalMap(events: calendar_v3.Schema$Events): Record<string, [string, st
   return out;
 }
 
-//! going to make dir = dir
-//* Hypothesis Good For Dir
 /** Data Directory for JSON Imports */
 function isDev() {
   return !!process.env.VITE_DEV_SERVER_URL;
@@ -230,8 +241,6 @@ function getDataDir(): string {
   const prodDir = DATA_DIR;
   const dir = isDev() ? devDir : prodDir;
   if (!fssync.existsSync(dir)) fssync.mkdirSync(dir, { recursive: true });
-  console.log(`[MAIN] getDataDir: ${dir}`)
-  //logToRenderer(`[MAIN] getDataDir${dir}`)
   return dir;
 } 
 //? maybe don't need getDataDir() bc prodDir = devDir
@@ -239,9 +248,6 @@ async function writeCalendarJsonFile(baseName: string, json: string) {
   const dir = getDataDir();
   const filePath = path.join(dir, baseName);
   await fs.writeFile(filePath, json, 'utf8');
-  console.log(`\n[CAL] writeCalendarJsonFile(${baseName})`)
-   console.log(` dir: ${dir})`)
-   console.log(` filepath: ${filePath})`)
   return filePath;
 }
 // Fetch one calendar's events and return file path and calendar name
@@ -276,9 +282,6 @@ async function exportOneCalendarToDataDir(opts: {
   const baseName = opts.suggestName ?? `schedule_${calName.slice(0, 3)}.json`;
   const filePath = await writeCalendarJsonFile(baseName, json);
   
-  console.log(`\n[CAL] exportOneCalendarToDataDir()`)
-  console.log(` filepath: ${filePath} `)
-  console.log(` calName: ${calName} \n`)
   return { ok: true as const, filePath, calName };
 }
 
@@ -286,7 +289,8 @@ async function getAuthorizedClient(): Promise<import('google-auth-library').OAut
   //  console.log('\n[AUTH] entering getAuthorizedClient');
   const { installed } = await loadClientJSON();
   const cached = await loadTokens();
-  //  console.log('[AUTH] cached?', !!cached);
+  
+   console.log('[AUTH] cached?', !!cached);
   if (cached) {
     // Use the first redirect URI from the client JSON
     const fallback = 'http://127.0.0.1';
@@ -303,12 +307,10 @@ async function getAuthorizedClient(): Promise<import('google-auth-library').OAut
 
 function registerGoogleIpc() {
   // Connect and open Calendar Upload Window
-  console.log(`Data directory = ${DATA_DIR}`)
   ipcMain.handle('google:connectAndOpenUpload', async () => {
     try {
       // make sure packaged creds exist
       await fs.access(CREDS_PATH);
-      console.log(`\n[MAIN] GoogleIPC Creds Path: ${CREDS_PATH})`)
     } catch {
       throw new Error(`Missing Google credentials at ${CREDS_PATH}`);
     }
@@ -353,7 +355,7 @@ function registerGoogleIpc() {
     });
     return res.data
   });
-  //! This calls exportOneCalendarToDataDir
+  
   /** Export ONE calendar to a JSON file shaped*/
   ipcMain.handle('google:exportCalendarJson', async (_evt, opts: {
     calendarId: string;
@@ -361,7 +363,6 @@ function registerGoogleIpc() {
     timeMax: string;
     suggestedFilename?: string; // e.g., 'schedule_jkb.json'
   }) => {
-    console.log(`\n[ONE] exportCalendarJson(_evt, opts)`)
     
     try {
       const r = await exportOneCalendarToDataDir({ 
@@ -370,9 +371,7 @@ function registerGoogleIpc() {
         timeMax: opts.timeMax,
         suggestName: opts.suggestedFilename,
       });
-      // console.log(`\n[ONE] return 1 ${ {ok: true, filePath, calName} }`)
       return r; // { ok: true, filePath, calName }
-      // console.log(`\n   [ONE] return 2 ${ {ok: true, filePath, calName} }`)
     } catch (e: any) {
       return { ok: false as const, error: String(e?.message ?? e) };
     }
@@ -385,21 +384,17 @@ function registerGoogleIpc() {
   }) => {
     const results: Array<{ id: string; ok: boolean; filePath?: string; error?: string }> = [];
     for (const id of opts.calendarIds) {
-      console.log(`[IPC] exporting calendar`)
       try {
         const r = await exportOneCalendarToDataDir({
           calendarId: id,
           timeMin: opts.timeMin,
           timeMax: opts.timeMax,
         });
-        // console.log(`\n[EMC] 1 results.push(${ {id, ok: true, filePath: r.filePath} })`)
         results.push({ id, ok: true, filePath: r.filePath });
-        // console.log(`\n   [EMC] 2 results.push(${ {ok: true, filePath, calName} })`)
       } catch (e: any) {
         results.push({ id, ok: false, error: String(e?.message ?? e) });
       }
     }
-    // console.log(`\n[EMC]return `)
     return results;
   });
 }
@@ -407,9 +402,9 @@ function registerGoogleIpc() {
 // ------------------ Electron Windows  --------------- //
 
 let py: import('child_process').ChildProcessWithoutNullStreams | null = null;
-// let win: BrowserWindow | null = null;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// let win: BrowserWindow | null = null; //TODO delete these
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 let uploadWin: BrowserWindow | null = null;
 //TODO theme stuff 
 // // const isDark = nativeTheme.shouldUseDarkColors;
@@ -512,27 +507,32 @@ function createWindow() {
 
 // ----------------- Python Launch Code --------------- //* New
 function spawnPython() {
-  
-  //const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'; //! works
+
+  //const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'; //? Old
   const python = app.isPackaged //* New
     ? path.join(RUNTIME_BASE, 'py-venv', 'bin', 'python3')   // embedded venv
     : (process.platform === 'win32' ? 'python' : 'python3'); // dev
 
-  // const scriptPath = app.isPackaged ? path.join(PYPROJ, 'watch_card.py') : path.join(__dirname, '../../../py-project/watch_card.py') //! works
+  // const scriptPath = app.isPackaged ? path.join(PYPROJ, 'watch_card.py') : path.join(__dirname, '../../../py-project/watch_card.py') //?Old
   const scriptPath = path.join(PYPROJ, 'watch_card.py'); //* New
   
   const exiftoolPath = app.isPackaged //* New
     ? path.join(RUNTIME_BASE, 'exiftool', 'exiftool')        // bundled
     : 'exiftool';                                            // dev PATH/Homebrew
 
-  const env = { //* New
+  //? quick sanity logs
+  console.log('\n[DEV?]', !app.isPackaged);
+  console.log('[PYTHON]', python);
+  console.log('[SCRIPT]', scriptPath, 'exists?', fssync.existsSync(scriptPath));
+  
+  // Pass down PATHS to Python
+  const env = { //*New
     ...process.env,
-    // keep your existing dirs available to Python
-    APP_RESOURCES: RESOURCES_DIR,  // your packaged resources/
-    PY_PROJECT: PYPROJ,
-    DATA_DIR,
-    USERDATA_DIR,
-    EXIFTOOL_PATH: exiftoolPath,
+    APP_RESOURCES: RESOURCES_DIR, //? why change name
+    PY_PROJECT: PYPROJ,           //? why change name
+    DATA_DIR, 
+    USERDATA_DIR, 
+    EXIFTOOL_PATH: exiftoolPath,  //? why change name
     PATH: [
       app.isPackaged ? path.dirname(python) : '',
       '/usr/bin','/bin','/usr/sbin','/sbin',
@@ -540,8 +540,20 @@ function spawnPython() {
     ].filter(Boolean).join(':'),
   };
 
-  // py = spawn(pythonCmd, [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'], }); //! works
+  //! AUTH checks
+  console.log('\n[AUTH] Dev?', !app.isPackaged); 
+  console.log(`   User Data Dir: ${USERDATA_DIR}`) // Dev: /Users/maryalice/Library/Application Support/Barback dev beta 1
+  console.log(`   Token Path: ${TOKEN_PATH}`) // Dev: 
+  console.log(`   Tokens File: ${TOKENS_FILE}`)
+
+  // py = spawn(pythonCmd, [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'], }); //?Old
   py = spawn(python, [scriptPath], { stdio: ['pipe','pipe','pipe'], env }); //* New
+
+  // Diagnostics
+  py.on('error', (err) => {
+    console.error('[PY ERROR]', err);
+    if (win) win.webContents.send('py:stderr', String(err));
+  });
 
   /* set python logs to print to dev console */
   const rl = readline.createInterface({ input: py.stdout }); rl.on('line', (line) => {
@@ -590,7 +602,7 @@ app.whenReady().then(() => {
   spawnPython();
   createWindow();
 
-  // console.log('\n[APP]', 'name=', app.getName());
+  console.log('\n[APP]', APP_NAME);
   // console.log('[APP]', 'data dir=', DATA_DIR);
   // console.log('[APP]', 'userData=', app.getPath('userData'));
   // console.log('[APP]', 'resourcesPath=', process.resourcesPath);
