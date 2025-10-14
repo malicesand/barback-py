@@ -201,7 +201,7 @@ export default function CardsPanel() {
       
       <div style={{ padding: 12 }}>
         <h3>Renamed Cards (DCIM)</h3>
-         {renamed.length === 0 && <div>No cards detected.</div>}
+         {renamed.length === 0 && <div>No cards detected</div>}
 
           <div style={{
             display: 'grid',

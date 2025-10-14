@@ -34,7 +34,7 @@ export default function CallConnect() {
 
    return (
       <div style={{ padding: 16, fontFamily: 'system-ui' }}>
-        <h1>Turts Alerts</h1>
+        <h1>smallestHog69</h1>
         <div>
           {calendars.map(c => {
             const checked = selected.includes(c.id)
@@ -47,13 +47,20 @@ export default function CallConnect() {
               {c.summary}
             </div>
           )})}
-          <button onClick={() => saveSelected(selected)}> Upload </button>
+          <button onClick={() => saveSelected(selected)}> Download </button>
         </div>
-        <ul>
-          {schedules.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ul>
+        <div style={{ border: '1px solid #999', borderRadius: 8, padding: 12 }}> 
+          <h3>Downloaded Calendars</h3>
+            <div style={{ fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
+            {schedules.map((s, i) => (
+              <span key={i}>{s}</span>
+            ))}            
+          </div>
+        </div>
       </div>
     );
 } 
+
+/** Backlog
+ * Time / Date downloaded
+ */
