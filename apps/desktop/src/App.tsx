@@ -21,7 +21,7 @@ export default function App() {
   return (
     <div style={{ padding: 16, fontFamily: 'system-ui' }}>
       <h1>Python Bridge Demo</h1>
-      <button>Prefix Map</button>
+      {/* <button>Prefix Map</button> */}
       <button
         onClick={() => window.gcal.googleConnectAndOpenUpload()}
       >

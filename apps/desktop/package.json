@@ -1,9 +1,11 @@
 {
-  "name": "barback-desktop",
+  "name": "barback-ingest-companion",
   "private": true,
   "version": "1.2.1",
   "type": "module",
   "main": "dist-electron/main.js",
+  "author": "Mary Alice",
+  "description": "Rename from phot capture time",
   "scripts": {
     "clean": "rimraf dist dist-electron release",
     "dev": "vite",
@@ -47,7 +49,7 @@
   },
   "build": {
     "appId": "dev.maryalice.barback",
-    "productName": "Barback Ingest Companion",
+    "productName": "Barback",
     "icon": "icon.png",
     "files": [
       "dist/**",
